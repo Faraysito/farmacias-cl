@@ -1,0 +1,134 @@
+---
+import "../styles/global.css";
+
+const title = "Comparador de Farmacias Chile";
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{title}</title>
+  </head>
+  <body class="bg-slate-50 min-h-screen">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-slate-900">{title}</h1>
+        <p class="text-slate-600 mt-1">
+          Compara precios de medicamentos en cadenas chilenas
+        </p>
+      </header>
+
+      <div
+        x-data="buscador()"
+        class="space-y-6"
+      >
+        <div class="flex gap-2">
+          <input
+            type="text"
+            x-model="query"
+            @keyup.enter="buscar()"
+            placeholder="Buscar medicamento (ej: losartan)"
+            class="flex-1 px-4 py-3 rounded-lg border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none"
+          />
+          <button
+            @click="buscar()"
+            :disabled="loading"
+            class="px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <span x-show="!loading">Buscar</span>
+            <span x-show="loading">Buscando...</span>
+          </button>
+        </div>
+
+        <template x-if="error">
+          <div
+            class="p-4 bg-red-50 text-red-700 rounded-lg"
+            x-text="error"
+          >
+          </div>
+        </template>
+
+        <template x-if="!loading && resultados.length === 0 && yaBusque">
+          <div class="text-center py-12 text-slate-500">
+            Sin resultados para "<span x-text="ultimaQuery"></span>"
+          </div>
+        </template>
+
+        <template x-if="resultados.length > 0">
+          <div>
+            <div class="text-sm text-slate-500 mb-3">
+              <span x-text="resultados.length"></span> resultados
+            </div>
+
+            <div class="space-y-3">
+              <template x-for="med in resultados" :key="med.id">
+                <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                      <h3 class="font-semibold text-slate-900" x-text="med.nombre_comercial"></h3>
+                      <div class="flex flex-wrap items-center gap-2 mt-1 text-sm text-slate-500">
+                        <span x-text="med.laboratorio || 'Sin laboratorio'"></span>
+                        <template x-if="med.es_bioequivalente">
+                          <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
+                            BIOEQUIVALENTE
+                          </span>
+                        </template>
+                      </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <template x-for="p in med.precios" :key="p.cadena">
+                        <div>
+                          <div class="text-xs uppercase text-slate-400" x-text="p.cadena"></div>
+                          <div class="text-xl font-bold text-slate-900" x-text="formatearPrecio(p.precio)"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <script is:inline>
+      function buscador() {
+        return {
+          query: "",
+          ultimaQuery: "",
+          resultados: [],
+          loading: false,
+          error: "",
+          yaBusque: false,
+          async buscar() {
+            if (this.query.trim().length < 2) {
+              this.error = "Escribe al menos 2 caracteres";
+              return;
+            }
+            this.loading = true;
+            this.error = "";
+            this.ultimaQuery = this.query;
+            try {
+              const r = await fetch(
+                `http://localhost:8000/api/buscar?q=${encodeURIComponent(this.query)}`
+              );
+              if (!r.ok) throw new Error("Error del servidor");
+              this.resultados = await r.json();
+              this.yaBusque = true;
+            } catch (e) {
+              this.error = "No se pudo conectar con el servidor. ¿Está corriendo el backend?";
+              this.resultados = [];
+            } finally {
+              this.loading = false;
+            }
+          },
+          formatearPrecio(p) {
+            return "$" + p.toLocaleString("es-CL");
+          },
+        };
+      }
+    </script>
+  </body>
+</html>

@@ -1,16 +1,27 @@
 from typing import List
+import unicodedata
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import PrincipioActivo, Medicamento, Farmacia, Precio
 from app.scrapers.base import ProductoRaw
-from app.utils import parsear_medicamento
+from app.normalizador import normalizar
+
+
+def _normalizar_lab(lab: str | None) -> str:
+    """Normaliza laboratorio para comparación (sin tildes, lower, sin sufijos)."""
+    if not lab:
+        return ""
+    s = "".join(
+        c for c in unicodedata.normalize("NFD", lab.lower())
+        if unicodedata.category(c) != "Mn"
+    )
+    for sufijo in [" s.a", " sa", " spa", " ltda", " limitada", " chile"]:
+        s = s.replace(sufijo, "")
+    return s.strip()
 
 
 def get_or_create_farmacia_cadena(db: Session, cadena: str) -> Farmacia:
-    """
-    Para precios online de cadenas (no sucursales físicas), usamos una farmacia
-    "virtual" por cadena. Después agregamos sucursales reales.
-    """
+    """Farmacia 'virtual' por cadena online."""
     f = db.query(Farmacia).filter(
         Farmacia.cadena == cadena,
         Farmacia.nombre == f"{cadena} online"
@@ -43,12 +54,16 @@ def get_or_create_medicamento(
     es_bio: bool,
     principio_id: int,
 ) -> Medicamento:
-    m = db.query(Medicamento).filter(
-        Medicamento.nombre_comercial == nombre_comercial,
+    """Agrupa por principio+laboratorio normalizado, no por nombre comercial."""
+    lab_norm = _normalizar_lab(laboratorio)
+
+    candidatos = db.query(Medicamento).filter(
         Medicamento.principio_activo_id == principio_id,
-    ).first()
-    if m:
-        return m
+    ).all()
+    for c in candidatos:
+        if _normalizar_lab(c.laboratorio) == lab_norm:
+            return c
+
     m = Medicamento(
         nombre_comercial=nombre_comercial,
         laboratorio=laboratorio,
@@ -66,7 +81,8 @@ def guardar_productos(productos: List[ProductoRaw]) -> int:
     insertados = 0
     try:
         for p in productos:
-            principio_nombre, dosis = parsear_medicamento(p.nombre)
+            principio_nombre, dosis_mg = normalizar(p.nombre, p.marca)
+            dosis = f"{dosis_mg}mg" if dosis_mg is not None else None
             principio = get_or_create_principio(db, principio_nombre, dosis)
             medicamento = get_or_create_medicamento(
                 db,
@@ -76,7 +92,7 @@ def guardar_productos(productos: List[ProductoRaw]) -> int:
                 principio_id=principio.id,
             )
             farmacia = get_or_create_farmacia_cadena(db, p.cadena)
-            
+
             precio = Precio(
                 medicamento_id=medicamento.id,
                 farmacia_id=farmacia.id,
@@ -85,7 +101,7 @@ def guardar_productos(productos: List[ProductoRaw]) -> int:
             )
             db.add(precio)
             insertados += 1
-        
+
         db.commit()
         return insertados
     except Exception:

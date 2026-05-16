@@ -7,7 +7,6 @@ from app.scrapers.base import ProductoRaw
 async def buscar(query: str, timeout_ms: int = 30000) -> List[ProductoRaw]:
     api_response = {"value": None}
     captured = asyncio.Event()
-
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
@@ -28,15 +27,12 @@ async def buscar(query: str, timeout_ms: int = 30000) -> List[ProductoRaw]:
                     pass
 
         page.on("response", handle_response)
-
         url = f"https://www.cruzverde.cl/search?query={query}"
         await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-
         try:
             await asyncio.wait_for(captured.wait(), timeout=15)
         except asyncio.TimeoutError:
             pass
-
         await browser.close()
 
     data = api_response["value"]
@@ -63,16 +59,4 @@ async def buscar(query: str, timeout_ms: int = 30000) -> List[ProductoRaw]:
             url=hit.get("link", ""),
             imagen=hit.get("image", {}).get("link") if isinstance(hit.get("image"), dict) else None,
         ))
-    return productos
-
-
-if __name__ == "__main__":
-    async def main():
-        resultados = await buscar("losartan")
-        print(f"{len(resultados)} productos\n")
-        for p in resultados:
-            desc = f" (-{p.descuento_pct}%)" if p.descuento_pct else ""
-            bio = " [BIO]" if p.es_bioequivalente else ""
-            print(f"  {p.nombre}{bio}")
-            print(f"    {p.marca} | ${p.precio_actual:,.0f}{desc}")
-    asyncio.run(main())
+    return productos    

@@ -1,23 +1,47 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, func
-from app.database import get_db
+from collections import defaultdict
+from app.database import get_db, SessionLocal
 from app.models import Medicamento, Precio, Farmacia, PrincipioActivo
-from app.schemas import MedicamentoResponse, PrecioResponse
+from app.schemas import GrupoResponse, MedicamentoEnGrupo, PrecioResponse
+from app.scrape_orchestrator import scrape_todas
 
 router = APIRouter()
 
+UMBRAL_PRODUCTOS_MIN = 3  # bajo esto, dispara scrape on-demand
 
-@router.get("/buscar", response_model=list[MedicamentoResponse])
-def buscar_medicamentos(
-    q: str = Query(..., min_length=2, description="Término de búsqueda"),
+
+@router.get("/buscar", response_model=list[GrupoResponse])
+async def buscar_medicamentos(
+    q: str = Query(..., min_length=2),
     db: Session = Depends(get_db),
 ):
-    """
-    Busca medicamentos por nombre comercial o principio activo.
-    Devuelve cada medicamento con su último precio por cadena.
-    """
-    # 1. Buscar medicamentos cuyo nombre o principio activo matchee
+    """Busca y agrupa por (principio_activo, dosis). Scrapea on-demand si hay pocos datos."""
+    grupos = _buscar_en_db(db, q)
+
+    total_productos = sum(g.cantidad_medicamentos for g in grupos)
+    print(f"[buscar] q='{q}' productos_en_db={total_productos}")
+    
+    if total_productos < UMBRAL_PRODUCTOS_MIN:
+        print(f"[buscar] disparando scrape on-demand para '{q}'")
+        try:
+            resumen = await scrape_todas(q)
+            print(f"[buscar] scrape terminado: {resumen}")
+        except Exception as e:
+            print(f"[buscar] scrape falló: {type(e).__name__}: {e}")
+        
+        db_fresh = SessionLocal()
+        try:
+            grupos = _buscar_en_db(db_fresh, q)
+        finally:
+            db_fresh.close()
+        print(f"[buscar] después de scrape: {len(grupos)} grupos")
+
+    return grupos
+
+
+def _buscar_en_db(db: Session, q: str) -> list[GrupoResponse]:
     query_lower = f"%{q.lower()}%"
     medicamentos = (
         db.query(Medicamento)
@@ -27,49 +51,61 @@ def buscar_medicamentos(
             func.lower(Medicamento.nombre_comercial).like(query_lower)
             | func.lower(PrincipioActivo.nombre).like(query_lower)
         )
-        .limit(50)
         .all()
     )
-
     if not medicamentos:
         return []
 
-    # 2. Para cada medicamento, traer el último precio por farmacia
-    resultado = []
+    grupos: dict[tuple, list[MedicamentoEnGrupo]] = defaultdict(list)
     for med in medicamentos:
-        # Subquery: último precio por farmacia para este medicamento
-        ultimos_precios = (
+        if not med.principio_activo or not med.principio_activo.nombre.strip():
+            continue
+        principio = med.principio_activo.nombre.strip()
+        dosis = med.principio_activo.dosis
+        key = (principio, dosis)
+
+        precios_raw = (
             db.query(Precio, Farmacia)
             .join(Farmacia, Farmacia.id == Precio.farmacia_id)
             .filter(Precio.medicamento_id == med.id)
             .order_by(desc(Precio.fecha_scrape))
             .all()
         )
-
-        # Quedarse con el más reciente por farmacia
         vistos = set()
-        precios_unicos = []
-        for precio, farmacia in ultimos_precios:
-            if farmacia.id in vistos:
+        precios = []
+        for precio, farmacia in precios_raw:
+            if farmacia.cadena in vistos:
                 continue
-            vistos.add(farmacia.id)
-            precios_unicos.append(PrecioResponse(
+            vistos.add(farmacia.cadena)
+            precios.append(PrecioResponse(
                 cadena=farmacia.cadena,
                 precio=precio.precio,
                 stock=precio.stock or False,
                 fecha_scrape=precio.fecha_scrape,
             ))
+        if not precios:
+            continue
 
-        resultado.append(MedicamentoResponse(
+        grupos[key].append(MedicamentoEnGrupo(
             id=med.id,
             nombre_comercial=med.nombre_comercial,
             laboratorio=med.laboratorio,
             es_bioequivalente=med.es_bioequivalente or False,
-            principio_activo=med.principio_activo.nombre if med.principio_activo else None,
-            dosis=med.principio_activo.dosis if med.principio_activo else None,
-            precios=precios_unicos,
+            precios=precios,
         ))
 
-    # 3. Ordenar por precio mínimo ascendente
-    resultado.sort(key=lambda m: min((p.precio for p in m.precios), default=float('inf')))
-    return resultado
+    resultado = []
+    for (principio, dosis), meds in grupos.items():
+        meds.sort(key=lambda m: min((p.precio for p in m.precios), default=float('inf')))
+        precio_min = min(
+            (p.precio for m in meds for p in m.precios),
+            default=float('inf'),
+        )
+        resultado.append((precio_min, GrupoResponse(
+            principio_activo=principio,
+            dosis=dosis,
+            cantidad_medicamentos=len(meds),
+            medicamentos=meds,
+        )))
+    resultado.sort(key=lambda x: x[0])
+    return [g for _, g in resultado]

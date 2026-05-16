@@ -1,18 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from app.api import busqueda
+from app.api import busqueda, home
 
 app = FastAPI(title="Farmacias CL API")
 
-# CORS
 ALLOWED_ORIGINS = [
     "http://localhost:4321",
     "http://localhost:3000",
     "https://farmacias-cl.vercel.app",
 ]
 
-# Permitir previews de Vercel (*.vercel.app de tu proyecto)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -23,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(busqueda.router, prefix="/api", tags=["busqueda"])
+app.include_router(home.router, prefix="/api", tags=["home"])
 
 
 @app.get("/")

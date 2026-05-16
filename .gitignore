@@ -29,3 +29,5 @@ Thumbs.db
 
 # Playwright cache
 .playwright/
+
+.env

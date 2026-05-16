@@ -42,7 +42,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
 
         <template x-if="loading && lentoOnDemand">
           <div class="p-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-sm">
-            🔍 Buscando precios en las 3 cadenas en tiempo real. Esto puede tardar 10-15 segundos la primera vez...
+            🔍 Buscando precios en las 3 cadenas en tiempo real. Esto puede tardar 10-15 o hasta 40 segundos por el coldstart de render...
           </div>
         </template>
 

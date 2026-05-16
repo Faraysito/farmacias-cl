@@ -17,12 +17,14 @@ Este proyecto resuelve eso: una sola búsqueda, las tres cadenas comparadas lado
 
 ## Cómo funciona
 
-1. El usuario busca un medicamento (ej. "losartan")
-2. El backend revisa si hay datos recientes en DB
-3. Si la DB está vacía o tiene pocos resultados, dispara scraping **on-demand** de las 3 cadenas en paralelo
-4. Los resultados se normalizan: se extrae principio activo, dosis y se eliminan marcas/laboratorios del nombre
-5. Se agrupan productos con el mismo principio activo + dosis
-6. El frontend muestra cada grupo como una card, con todas las ofertas ordenadas de menor a mayor precio
+1. El usuario busca un medicamento (ej. "losartan") o usa los chips/categorías del home
+2. El autocomplete sugiere principios activos y nombres comerciales mientras escribe
+3. El backend revisa si hay datos recientes en DB
+4. Si la DB está vacía o tiene pocos resultados, dispara scraping **on-demand** de las cadenas activas en paralelo
+5. Los resultados se normalizan: se extrae principio activo, dosis y se eliminan marcas/laboratorios del nombre
+6. Se agrupan productos con el mismo principio activo + dosis
+7. El frontend muestra cada grupo como una card, con todas las ofertas ordenadas de menor a mayor precio
+8. El usuario puede filtrar por bioequivalente, cadena o precio máximo, ver histórico de precios de un medicamento y hacer click en "Comprar →" para ir directo al producto en la cadena
 
 ---
 
@@ -40,12 +42,14 @@ Este proyecto resuelve eso: una sola búsqueda, las tres cadenas comparadas lado
 - **Astro** (static site generator)
 - **Tailwind CSS** (estilos)
 - **Alpine.js** (interactividad mínima)
+- **Chart.js** + **date-fns adapter** (gráficos de histórico)
 
 ### Infra
 - **Render** (backend, free tier)
 - **Vercel** (frontend, free)
 - **Neon** (Postgres serverless, free)
 - **UptimeRobot** (ping cada 5 min para evitar cold starts de Render)
+- **GitHub Actions** (cron nocturno que dispara scrape diario)
 
 ---
 
@@ -77,14 +81,23 @@ Si un usuario busca algo que no está en DB, el backend scrapea las cadenas acti
 
 Para detectar que "Losartan 50mg de Labchile" en Salcobrand es el mismo producto que "Losartán 50mg" en Ahumada, se compara por (principio_activo, dosis, laboratorio_normalizado). Sin un dataset maestro (ISP), no es perfecto: cadenas distintas escriben los laboratorios con nombres distintos, por eso a veces aparecen como ofertas separadas dentro del mismo grupo de principio activo.
 
+### Scheduler nocturno por GitHub Actions (en vez de Celery)
+
+El plan inicial era usar Celery + Redis para correr scrapes nocturnos sobre el top de medicamentos crónicos. El problema: Render free tier no permite procesos worker adicionales, y Celery dormiría junto al servicio web. La solución fue mover el cron fuera del servidor: un workflow de GitHub Actions corre todos los días a las 04:00 UTC, despierta Render con un ping y llama a un endpoint protegido `/api/admin/scrape-top` con un token. Más confiable, sin infra extra, gratis.
+
+### Histórico de precios con deduplicación diaria
+
+Cada scrape inserta una fila por (medicamento, farmacia) **solo si no existe ya una para ese mismo día**. Si existe, actualiza el precio. Esto asegura un único punto por día y permite construir el gráfico histórico sin ruido por scrapes manuales repetidos.
+
 ---
 
 ## Estructura del proyecto
-
-```
 farmacias-cl/
 ├── README.md
 ├── docker-compose.yml          # Postgres + Redis para dev local
+├── .github/
+│   └── workflows/
+│       └── scrape-cron.yml     # Cron nocturno
 ├── backend/
 │   ├── alembic/                # Migraciones DB
 │   ├── alembic.ini
@@ -102,7 +115,11 @@ farmacias-cl/
 │   │   ├── persistencia.py     # get_or_create + guardar_productos
 │   │   ├── scrape_orchestrator.py  # Scrape paralelo de las 3 cadenas
 │   │   ├── api/
-│   │   │   └── busqueda.py     # GET /api/buscar?q=...
+│   │   │   ├── busqueda.py     # GET /api/buscar?q=...
+│   │   │   ├── home.py         # GET /api/home/categorias|top|stats
+│   │   │   ├── autocomplete.py # GET /api/autocomplete?q=...
+│   │   │   ├── historico.py    # GET /api/historico/{med_id}
+│   │   │   └── admin.py        # POST /api/admin/scrape-top (token)
 │   │   └── scrapers/
 │   │       ├── base.py         # Dataclass ProductoRaw común
 │   │       ├── cruzverde.py    # Playwright
@@ -115,16 +132,14 @@ farmacias-cl/
 │       ├── reset_y_scrape.py   # Limpia DB y rescrapea desde 0
 │       └── test_normalizador.py
 └── frontend/
-    ├── package.json
-    ├── astro.config.mjs
-    ├── tailwind.config.mjs
-    └── src/
-        ├── pages/
-        │   └── index.astro     # Buscador + listado de grupos
-        └── styles/
-            └── global.css
-```
-
+├── package.json
+├── astro.config.mjs
+├── tailwind.config.mjs
+└── src/
+├── pages/
+│   └── index.astro     # Home + buscador + resultados + modal histórico
+└── styles/
+└── global.css
 ---
 
 ## Setup local
@@ -168,6 +183,7 @@ Copia `.env.example` a `.env`:
 DATABASE_URL=postgresql+psycopg://farmacias:dev@localhost:5433/farmacias
 REDIS_URL=redis://localhost:6379/0
 DISABLE_CRUZVERDE=0
+ADMIN_TOKEN=cambia-esto-por-algo-random
 ```
 
 Aplicar migraciones:
@@ -198,7 +214,7 @@ Frontend en `http://localhost:4321`.
 
 ```bash
 cd backend
-python -m scripts.reset_y_scrape
+$env:PYTHONPATH="."; python scripts/reset_y_scrape.py
 ```
 
 Esto scrapea ~8 medicamentos comunes (losartan, metformina, atorvastatina, paracetamol, ibuprofeno, omeprazol, enalapril, amoxicilina) en las 3 cadenas y guarda en DB.
@@ -222,39 +238,35 @@ python -m scripts.test_normalizador
 
 ---
 
-## Endpoint principal
+## Endpoints
 
 ### `GET /api/buscar?q={query}`
 
 Busca medicamentos por nombre comercial o principio activo. Si hay pocos resultados en DB, dispara scrape on-demand.
 
-**Response:**
+### `GET /api/autocomplete?q={query}`
 
-```json
-[
-  {
-    "principio_activo": "losartan",
-    "dosis": "50mg",
-    "cantidad_medicamentos": 6,
-    "medicamentos": [
-      {
-        "id": 12,
-        "nombre_comercial": "Losartán (B) 50mg 30 Comprimidos",
-        "laboratorio": "Losartán",
-        "es_bioequivalente": true,
-        "precios": [
-          {
-            "cadena": "salcobrand",
-            "precio": 1495.0,
-            "stock": true,
-            "fecha_scrape": "2026-05-16T..."
-          }
-        ]
-      }
-    ]
-  }
-]
-```
+Sugerencias por prefijo (mínimo 2 caracteres). Mezcla principios activos y nombres comerciales, limitado a 8.
+
+### `GET /api/historico/{med_id}?dias=90`
+
+Devuelve el histórico de precios de un medicamento, agrupado por cadena, para los últimos N días.
+
+### `GET /api/home/categorias`
+
+Categorías hardcoded del home (presión, colesterol, diabetes, etc).
+
+### `GET /api/home/top`
+
+Top medicamentos disponibles (1 por principio activo, el más barato).
+
+### `GET /api/home/stats`
+
+Conteos globales para el hero (medicamentos, precios, principios activos, cadenas).
+
+### `POST /api/admin/scrape-top`
+
+Endpoint protegido con header `X-Admin-Token`. Encola un scrape del top 12 de medicamentos crónicos. Lo llama el cron de GitHub Actions cada noche.
 
 ---
 
@@ -269,6 +281,7 @@ Busca medicamentos por nombre comercial o principio activo. Si hay pocos resulta
 - Variables de entorno:
   - `DATABASE_URL` (Neon connection string con `postgresql+psycopg://` y `?sslmode=require`)
   - `DISABLE_CRUZVERDE=1`
+  - `ADMIN_TOKEN` (el mismo valor que en el secret de GitHub)
 
 ### Frontend en Vercel
 
@@ -281,6 +294,14 @@ Busca medicamentos por nombre comercial o principio activo. Si hay pocos resulta
 
 - Plan free (0.5 GB, no expira)
 - PostGIS habilitado: `CREATE EXTENSION IF NOT EXISTS postgis;`
+
+### Cron nocturno con GitHub Actions
+
+- Workflow en `.github/workflows/scrape-cron.yml`
+- Corre todos los días a las 04:00 UTC (~01:00 hora Chile)
+- Secret `ADMIN_TOKEN` configurado en Settings → Secrets and variables → Actions
+- Despierta Render con un ping antes de disparar el scrape
+- Se puede ejecutar manualmente desde la pestaña Actions
 
 ### Mantener vivo Render free
 
@@ -299,16 +320,17 @@ UptimeRobot pinga `https://farmacias-cl-api.onrender.com` cada 5 min. Sin esto, 
 - [x] On-demand scraping cuando DB vacía
 - [x] UI con comparación lado a lado
 - [x] Deploy gratis 24/7
+- [x] Home con hero, categorías, top medicamentos y stats
+- [x] Buscador con autocomplete por prefijo
+- [x] Filtros UI: solo bioequivalentes, cadena, precio máximo
+- [x] Link directo a comprar en cada cadena
+- [x] Histórico de precios con gráficos (Chart.js)
+- [x] Scheduler nocturno automatizado por GitHub Actions
 
-### Próximo
-- [ ] Celery + scheduler nocturno para top 100 medicamentos crónicos
+### Pendiente
 - [ ] Integrar dataset ISP cuando vuelva online
 - [ ] Sistema de alertas por email (Resend) cuando baje el precio
-- [ ] Filtros en UI: solo bioequivalentes, rango de precio, cadena
-- [ ] Link directo a comprar en cada cadena
-- [ ] Búsqueda con sugerencias (autocomplete)
 - [ ] Farmacias independientes con PostGIS (mapa de cercanas)
-- [ ] Histórico de precios (gráficos)
 
 ### Deuda técnica conocida
 - Normalizador es lista negra manual; se reemplaza por ISP cuando vuelva

@@ -10,12 +10,14 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>{title}</title>
+    <script is:inline src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script is:inline src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script is:inline set:html={`window.API_URL = "${API_URL}";`}></script>
   </head>
   <body class="bg-slate-50 min-h-screen">
     <div x-data="app()" x-init="init()">
 
-      <!-- ===== HERO ===== -->
+      <!-- HERO -->
       <section class="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white">
         <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 80%, white 1px, transparent 1px); background-size: 40px 40px;"></div>
 
@@ -33,31 +35,56 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
             </p>
           </div>
 
-          <!-- Buscador -->
           <div class="max-w-2xl mx-auto">
-            <div class="flex gap-2 p-2 bg-white rounded-2xl shadow-2xl">
-              <input
-                type="text"
-                x-model="query"
-                @keyup.enter="buscar()"
-                placeholder="Buscar medicamento (ej: losartan, paracetamol)"
-                class="flex-1 px-4 py-3 text-slate-900 placeholder-slate-400 outline-none rounded-xl"
-              />
-              <button
-                @click="buscar()"
-                :disabled="loading"
-                class="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg"
-              >
-                <span x-show="!loading">🔍 Buscar</span>
-                <span x-show="loading">Buscando...</span>
-              </button>
+            <div class="relative">
+              <div class="flex gap-2 p-2 bg-white rounded-2xl shadow-2xl">
+                <input
+                  type="text"
+                  x-model="query"
+                  @input.debounce.250ms="pedirSugerencias()"
+                  @keyup.enter="cerrarSug(); buscar()"
+                  @keydown.arrow-down.prevent="navSug(1)"
+                  @keydown.arrow-up.prevent="navSug(-1)"
+                  @keydown.escape="cerrarSug()"
+                  @focus="if (sugerencias.length) sugAbierto = true"
+                  @click.outside="cerrarSug()"
+                  placeholder="Buscar medicamento (ej: losartan, paracetamol)"
+                  class="flex-1 px-4 py-3 text-slate-900 placeholder-slate-400 outline-none rounded-xl"
+                  autocomplete="off"
+                />
+                <button
+                  @click="cerrarSug(); buscar()"
+                  :disabled="loading"
+                  class="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg"
+                >
+                  <span x-show="!loading">🔍 Buscar</span>
+                  <span x-show="loading">Buscando...</span>
+                </button>
+              </div>
+
+              <div x-show="sugAbierto && sugerencias.length > 0"
+                   x-transition
+                   class="absolute left-2 right-2 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-20">
+                <template x-for="(s, i) in sugerencias" :key="s.valor + s.tipo">
+                  <button
+                    @click="query = s.valor; cerrarSug(); buscar()"
+                    @mouseenter="sugIndex = i"
+                    class="w-full text-left px-4 py-2 flex items-center justify-between text-slate-800 hover:bg-emerald-50 transition-colors"
+                    :class="i === sugIndex ? 'bg-emerald-50' : ''"
+                  >
+                    <span class="truncate" x-text="s.valor"></span>
+                    <span class="text-[10px] uppercase tracking-wide ml-2 shrink-0"
+                          :class="s.tipo === 'principio' ? 'text-emerald-700' : 'text-slate-400'"
+                          x-text="s.tipo"></span>
+                  </button>
+                </template>
+              </div>
             </div>
 
-            <!-- Chips rápidos -->
             <div class="flex flex-wrap gap-2 justify-center mt-4">
               <template x-for="c in ['losartan', 'paracetamol', 'ibuprofeno', 'omeprazol', 'atorvastatina']">
                 <button
-                  @click="query = c; buscar()"
+                  @click="query = c; cerrarSug(); buscar()"
                   class="px-3 py-1 bg-white/10 backdrop-blur hover:bg-white/20 border border-white/20 rounded-full text-sm transition-all"
                   x-text="c"
                 ></button>
@@ -65,7 +92,6 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
             </div>
           </div>
 
-          <!-- Stats -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 max-w-3xl mx-auto" x-show="stats">
             <div class="text-center">
               <div class="text-3xl font-bold" x-text="stats?.medicamentos || '...'"></div>
@@ -87,7 +113,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
         </div>
       </section>
 
-      <!-- ===== RESULTADOS (solo si hay) ===== -->
+      <!-- RESULTADOS -->
       <section x-show="yaBusque || loading" class="max-w-5xl mx-auto px-4 py-8">
         <template x-if="loading && lentoOnDemand">
           <div class="p-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-sm mb-4">
@@ -107,12 +133,47 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
 
         <template x-if="grupos.length > 0">
           <div>
+            <div class="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center gap-4">
+              <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input type="checkbox" x-model="filtros.soloBio" class="rounded text-emerald-600">
+                Solo bioequivalentes
+              </label>
+
+              <div class="flex items-center gap-2 text-sm text-slate-700">
+                <span>Cadena:</span>
+                <template x-for="c in ['cruzverde','salcobrand','ahumada']" :key="c">
+                  <button
+                    @click="toggleCadena(c)"
+                    class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border"
+                    :class="filtros.cadenas.includes(c) ? claseDeCadena(c) + ' border-transparent' : 'bg-white text-slate-400 border-slate-300'"
+                    x-text="labelDeCadena(c)"
+                  ></button>
+                </template>
+              </div>
+
+              <div class="flex items-center gap-2 text-sm text-slate-700">
+                <span>Precio máx:</span>
+                <input
+                  type="number"
+                  x-model.number="filtros.precioMax"
+                  placeholder="sin límite"
+                  min="0"
+                  step="500"
+                  class="w-28 px-2 py-1 border border-slate-300 rounded text-sm outline-none focus:border-emerald-500"
+                >
+              </div>
+
+              <button @click="limpiarFiltros()" class="text-xs text-slate-500 hover:text-slate-700 underline ml-auto">
+                limpiar
+              </button>
+            </div>
+
             <div class="text-sm text-slate-500 mb-3">
-              <span x-text="grupos.length"></span> grupos para "<span x-text="ultimaQuery" class="font-semibold text-slate-700"></span>" · ordenados por precio mínimo
+              <span x-text="gruposFiltrados().length"></span> grupos para "<span x-text="ultimaQuery" class="font-semibold text-slate-700"></span>" · ordenados por precio mínimo
             </div>
 
             <div class="space-y-6">
-              <template x-for="g in grupos" :key="g.principio_activo + (g.dosis || '')">
+              <template x-for="g in gruposFiltrados()" :key="g.principio_activo + (g.dosis || '')">
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                   <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-baseline justify-between flex-wrap gap-2">
                     <div>
@@ -149,6 +210,17 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
                         <div class="flex items-center gap-3 shrink-0">
                           <span class="px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide" :class="claseDeCadena(fila.cadena)" x-text="labelDeCadena(fila.cadena)"></span>
                           <div class="text-xl font-bold text-slate-900 w-24 text-right" x-text="formatearPrecio(fila.precio)"></div>
+                          <button
+                            @click="abrirHistorico(fila.med_id, fila.nombre)"
+                            class="px-2 py-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors text-xs"
+                            title="Ver histórico de precios"
+                          >📈</button>
+                          <template x-if="fila.url">
+                            <a :href="fila.url" target="_blank" rel="noopener"
+                               class="px-3 py-1.5 bg-slate-900 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors">
+                              Comprar →
+                            </a>
+                          </template>
                         </div>
                       </div>
                     </template>
@@ -160,7 +232,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
         </template>
       </section>
 
-      <!-- ===== CATEGORÍAS ===== -->
+      <!-- CATEGORÍAS -->
       <section x-show="!yaBusque" class="max-w-5xl mx-auto px-4 py-12">
         <div class="mb-8 text-center">
           <h2 class="text-2xl md:text-3xl font-bold text-slate-900">Busca por categoría</h2>
@@ -183,7 +255,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
         </div>
       </section>
 
-      <!-- ===== TOP MEDICAMENTOS ===== -->
+      <!-- TOP -->
       <section x-show="!yaBusque && top.length > 0" class="max-w-5xl mx-auto px-4 py-12">
         <div class="mb-8 text-center">
           <h2 class="text-2xl md:text-3xl font-bold text-slate-900">🔥 Más buscados</h2>
@@ -216,7 +288,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
         </div>
       </section>
 
-      <!-- ===== CÓMO FUNCIONA ===== -->
+      <!-- CÓMO FUNCIONA -->
       <section x-show="!yaBusque" class="bg-white border-t border-slate-200 py-16">
         <div class="max-w-5xl mx-auto px-4">
           <div class="mb-10 text-center">
@@ -244,7 +316,44 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
         </div>
       </section>
 
-      <!-- ===== FOOTER ===== -->
+      <!-- MODAL HISTÓRICO -->
+      <div x-show="historico.abierto"
+           x-transition.opacity
+           @keydown.escape.window="cerrarHistorico()"
+           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+           style="display: none">
+        <div @click.outside="cerrarHistorico()"
+             class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-slate-900">Histórico de precios</h3>
+              <p class="text-sm text-slate-600" x-text="historico.nombre"></p>
+            </div>
+            <button @click="cerrarHistorico()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
+          </div>
+
+          <div class="p-6 flex-1 overflow-auto">
+            <template x-if="historico.cargando">
+              <div class="text-center py-12 text-slate-500">Cargando datos...</div>
+            </template>
+
+            <template x-if="!historico.cargando && historico.sinDatos">
+              <div class="text-center py-12 text-slate-500">
+                Aún no hay suficiente historial para este medicamento.<br>
+                <span class="text-xs">Vuelve en unos días.</span>
+              </div>
+            </template>
+
+            <template x-if="!historico.cargando && !historico.sinDatos">
+              <div>
+                <canvas id="grafico-historico" style="max-height: 400px;"></canvas>
+                <p class="text-xs text-slate-500 mt-4 text-center">Últimos 90 días</p>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
       <footer class="bg-slate-900 text-slate-400 py-8">
         <div class="max-w-5xl mx-auto px-4 text-center text-sm">
           <p class="mb-2">Proyecto open source · FastAPI + Astro + PostgreSQL</p>
@@ -274,8 +383,25 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
           top: [],
           stats: null,
 
+          sugerencias: [],
+          sugAbierto: false,
+          sugIndex: -1,
+
+          filtros: {
+            soloBio: false,
+            cadenas: ["cruzverde", "salcobrand", "ahumada"],
+            precioMax: null,
+          },
+
+          historico: {
+            abierto: false,
+            cargando: false,
+            sinDatos: false,
+            nombre: "",
+            chart: null,
+          },
+
           async init() {
-            // Carga paralela del home (no bloquea UI)
             this.cargarHome();
           },
 
@@ -290,8 +416,39 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
               if (tR.ok) this.top = await tR.json();
               if (sR.ok) this.stats = await sR.json();
             } catch (e) {
-              console.warn("No se pudo cargar el home:", e);
+              console.warn("home falló", e);
             }
+          },
+
+          async pedirSugerencias() {
+            const q = this.query.trim();
+            if (q.length < 2) {
+              this.sugerencias = [];
+              this.sugAbierto = false;
+              return;
+            }
+            try {
+              const r = await fetch(`${window.API_URL}/api/autocomplete?q=${encodeURIComponent(q)}`);
+              if (!r.ok) return;
+              this.sugerencias = await r.json();
+              this.sugAbierto = this.sugerencias.length > 0;
+              this.sugIndex = -1;
+            } catch (e) {
+              // ignore
+            }
+          },
+
+          navSug(dir) {
+            if (!this.sugAbierto) return;
+            const max = this.sugerencias.length;
+            this.sugIndex = (this.sugIndex + dir + max) % max;
+            const s = this.sugerencias[this.sugIndex];
+            if (s) this.query = s.valor;
+          },
+
+          cerrarSug() {
+            this.sugAbierto = false;
+            this.sugIndex = -1;
           },
 
           async buscar() {
@@ -312,7 +469,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
               const r = await fetch(
                 `${window.API_URL}/api/buscar?q=${encodeURIComponent(this.query)}`
               );
-              if (!r.ok) throw new Error("Error del servidor");
+              if (!r.ok) throw new Error("server error");
               this.grupos = await r.json();
               this.yaBusque = true;
             } catch (e) {
@@ -325,10 +482,35 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
             }
           },
 
+          toggleCadena(c) {
+            const i = this.filtros.cadenas.indexOf(c);
+            if (i === -1) this.filtros.cadenas.push(c);
+            else this.filtros.cadenas.splice(i, 1);
+          },
+
+          limpiarFiltros() {
+            this.filtros.soloBio = false;
+            this.filtros.cadenas = ["cruzverde", "salcobrand", "ahumada"];
+            this.filtros.precioMax = null;
+          },
+
+          gruposFiltrados() {
+            const out = [];
+            for (const g of this.grupos) {
+              const filas = this.filasDe(g);
+              if (filas.length === 0) continue;
+              out.push(g);
+            }
+            return out;
+          },
+
           filasDe(grupo) {
             const filas = [];
             for (const med of grupo.medicamentos) {
+              if (this.filtros.soloBio && !med.es_bioequivalente) continue;
               for (const p of med.precios) {
+                if (!this.filtros.cadenas.includes(p.cadena)) continue;
+                if (this.filtros.precioMax && p.precio > this.filtros.precioMax) continue;
                 filas.push({
                   med_id: med.id,
                   nombre: med.nombre_comercial,
@@ -336,12 +518,98 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
                   es_bio: med.es_bioequivalente,
                   cadena: p.cadena,
                   precio: p.precio,
+                  url: p.url,
                 });
               }
             }
             filas.sort((a, b) => a.precio - b.precio);
             return filas;
           },
+
+          async abrirHistorico(medId, nombre) {
+            this.historico.abierto = true;
+            this.historico.cargando = true;
+            this.historico.sinDatos = false;
+            this.historico.nombre = nombre;
+
+            try {
+              const r = await fetch(`${window.API_URL}/api/historico/${medId}?dias=90`);
+              if (!r.ok) throw new Error();
+              const data = await r.json();
+
+              const cadenas = Object.keys(data.series);
+              const total = cadenas.reduce((a, c) => a + data.series[c].length, 0);
+
+              this.historico.cargando = false;
+
+              if (total < 2) {
+                this.historico.sinDatos = true;
+                return;
+              }
+
+              this.$nextTick(() => this.dibujarGrafico(data));
+            } catch (e) {
+              this.historico.cargando = false;
+              this.historico.sinDatos = true;
+            }
+          },
+
+          cerrarHistorico() {
+            this.historico.abierto = false;
+            if (this.historico.chart) {
+              this.historico.chart.destroy();
+              this.historico.chart = null;
+            }
+          },
+
+          dibujarGrafico(data) {
+            const canvas = document.getElementById("grafico-historico");
+            if (!canvas) return;
+
+            const colores = {
+              cruzverde: "#16a34a",
+              salcobrand: "#ea580c",
+              ahumada: "#dc2626",
+            };
+
+            const datasets = Object.entries(data.series).map(([cadena, puntos]) => ({
+              label: CADENAS_META[cadena]?.label || cadena,
+              data: puntos.map(p => ({ x: p.fecha, y: p.precio })),
+              borderColor: colores[cadena] || "#666",
+              backgroundColor: colores[cadena] || "#666",
+              tension: 0.2,
+              pointRadius: 3,
+            }));
+
+            if (this.historico.chart) this.historico.chart.destroy();
+
+            this.historico.chart = new Chart(canvas, {
+              type: "line",
+              data: { datasets },
+              options: {
+                responsive: true,
+                interaction: { mode: "nearest", intersect: false },
+                scales: {
+                  x: {
+                    type: "time",
+                    time: { unit: "day", tooltipFormat: "dd MMM yyyy" },
+                  },
+                  y: {
+                    beginAtZero: false,
+                    ticks: { callback: v => "$" + v.toLocaleString("es-CL") },
+                  },
+                },
+                plugins: {
+                  tooltip: {
+                    callbacks: {
+                      label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString("es-CL")}`,
+                    },
+                  },
+                },
+              },
+            });
+          },
+
           labelDeCadena(c) { return CADENAS_META[c]?.label || c; },
           claseDeCadena(c) { return CADENAS_META[c]?.clase || "bg-slate-100 text-slate-700"; },
           formatearPrecio(p) { return "$" + p.toLocaleString("es-CL"); },

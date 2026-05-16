@@ -9,8 +9,8 @@ class PrincipioActivo(Base):
     __tablename__ = "principios_activos"
     id = Column(Integer, primary_key=True)
     nombre = Column(String, nullable=False, index=True)
-    dosis = Column(String)  # "50mg", "500mg/5ml"
-    
+    dosis = Column(String)
+
     medicamentos = relationship("Medicamento", back_populates="principio_activo")
 
 
@@ -21,7 +21,7 @@ class Medicamento(Base):
     laboratorio = Column(String)
     es_bioequivalente = Column(Boolean, default=False)
     principio_activo_id = Column(Integer, ForeignKey("principios_activos.id"))
-    
+
     principio_activo = relationship("PrincipioActivo", back_populates="medicamentos")
     precios = relationship("Precio", back_populates="medicamento")
 
@@ -29,12 +29,12 @@ class Medicamento(Base):
 class Farmacia(Base):
     __tablename__ = "farmacias"
     id = Column(Integer, primary_key=True)
-    cadena = Column(String, nullable=False)  # "cruzverde", "salcobrand", "ahumada", "independiente"
+    cadena = Column(String, nullable=False)
     nombre = Column(String)
     direccion = Column(String)
     comuna = Column(String, index=True)
     ubicacion = Column(Geography(geometry_type="POINT", srid=4326))
-    
+
     precios = relationship("Precio", back_populates="farmacia")
 
 
@@ -45,7 +45,8 @@ class Precio(Base):
     farmacia_id = Column(Integer, ForeignKey("farmacias.id"))
     precio = Column(Float, nullable=False)
     stock = Column(Boolean, default=True)
+    url = Column(String)  # link directo al producto
     fecha_scrape = Column(DateTime, default=datetime.utcnow, index=True)
-    
+
     medicamento = relationship("Medicamento", back_populates="precios")
     farmacia = relationship("Farmacia", back_populates="precios")

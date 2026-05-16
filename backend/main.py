@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from app.api import busqueda, home
+from app.api import busqueda, home, autocomplete, historico, admin
 
 app = FastAPI(title="Farmacias CL API")
 
@@ -22,6 +21,9 @@ app.add_middleware(
 
 app.include_router(busqueda.router, prefix="/api", tags=["busqueda"])
 app.include_router(home.router, prefix="/api", tags=["home"])
+app.include_router(autocomplete.router, prefix="/api", tags=["autocomplete"])
+app.include_router(historico.router, prefix="/api", tags=["historico"])
+app.include_router(admin.router, prefix="/api", tags=["admin"])
 
 
 @app.get("/")

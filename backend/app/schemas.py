@@ -8,6 +8,7 @@ class PrecioResponse(BaseModel):
     precio: float
     stock: bool
     fecha_scrape: datetime
+    url: Optional[str] = None
 
 
 class MedicamentoResponse(BaseModel):
@@ -18,11 +19,11 @@ class MedicamentoResponse(BaseModel):
     principio_activo: Optional[str]
     dosis: Optional[str]
     precios: list[PrecioResponse]
-    
 
     class Config:
         from_attributes = True
-        
+
+
 class MedicamentoEnGrupo(BaseModel):
     id: int
     nombre_comercial: str

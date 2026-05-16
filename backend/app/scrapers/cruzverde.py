@@ -46,6 +46,11 @@ async def buscar(query: str, timeout_ms: int = 30000) -> List[ProductoRaw]:
         precio_normal = prices.get("price-list-cl")
         if precio_actual is None:
             continue
+
+        url_raw = hit.get("link", "")
+        if url_raw.startswith("/"):
+            url_raw = "https://www.cruzverde.cl" + url_raw
+
         productos.append(ProductoRaw(
             cadena="cruzverde",
             sku=str(hit.get("productId", "")),
@@ -56,7 +61,7 @@ async def buscar(query: str, timeout_ms: int = 30000) -> List[ProductoRaw]:
             descuento_pct=hit.get("discountPercentage"),
             stock=hit.get("stock", 0) > 0,
             es_bioequivalente=hit.get("isBioequivalent", False),
-            url=hit.get("link", ""),
+            url=url_raw,
             imagen=hit.get("image", {}).get("link") if isinstance(hit.get("image"), dict) else None,
         ))
-    return productos    
+    return productos

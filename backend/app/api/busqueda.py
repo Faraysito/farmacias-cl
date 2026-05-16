@@ -9,7 +9,7 @@ from app.scrape_orchestrator import scrape_todas
 
 router = APIRouter()
 
-UMBRAL_PRODUCTOS_MIN = 3  # bajo esto, dispara scrape on-demand
+UMBRAL_PRODUCTOS_MIN = 3
 
 
 @router.get("/buscar", response_model=list[GrupoResponse])
@@ -17,12 +17,11 @@ async def buscar_medicamentos(
     q: str = Query(..., min_length=2),
     db: Session = Depends(get_db),
 ):
-    """Busca y agrupa por (principio_activo, dosis). Scrapea on-demand si hay pocos datos."""
     grupos = _buscar_en_db(db, q)
 
     total_productos = sum(g.cantidad_medicamentos for g in grupos)
     print(f"[buscar] q='{q}' productos_en_db={total_productos}")
-    
+
     if total_productos < UMBRAL_PRODUCTOS_MIN:
         print(f"[buscar] disparando scrape on-demand para '{q}'")
         try:
@@ -30,7 +29,7 @@ async def buscar_medicamentos(
             print(f"[buscar] scrape terminado: {resumen}")
         except Exception as e:
             print(f"[buscar] scrape falló: {type(e).__name__}: {e}")
-        
+
         db_fresh = SessionLocal()
         try:
             grupos = _buscar_en_db(db_fresh, q)
@@ -41,22 +40,23 @@ async def buscar_medicamentos(
     return grupos
 
 
+# TODO: paginar
 def _buscar_en_db(db: Session, q: str) -> list[GrupoResponse]:
-    query_lower = f"%{q.lower()}%"
+    qlow = f"%{q.lower()}%"
     medicamentos = (
         db.query(Medicamento)
         .options(joinedload(Medicamento.principio_activo))
         .outerjoin(PrincipioActivo)
         .filter(
-            func.lower(Medicamento.nombre_comercial).like(query_lower)
-            | func.lower(PrincipioActivo.nombre).like(query_lower)
+            func.lower(Medicamento.nombre_comercial).like(qlow)
+            | func.lower(PrincipioActivo.nombre).like(qlow)
         )
         .all()
     )
     if not medicamentos:
         return []
 
-    grupos: dict[tuple, list[MedicamentoEnGrupo]] = defaultdict(list)
+    grupos = defaultdict(list)
     for med in medicamentos:
         if not med.principio_activo or not med.principio_activo.nombre.strip():
             continue
@@ -82,6 +82,7 @@ def _buscar_en_db(db: Session, q: str) -> list[GrupoResponse]:
                 precio=precio.precio,
                 stock=precio.stock or False,
                 fecha_scrape=precio.fecha_scrape,
+                url=precio.url,
             ))
         if not precios:
             continue

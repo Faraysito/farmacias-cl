@@ -1,0 +1,23 @@
+name: Scrape nocturno
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Despertar Render
+        run: curl -s -m 60 https://farmacias-cl-api.onrender.com/ || true
+
+      - name: Esperar arranque
+        run: sleep 30
+
+      - name: Disparar scrape
+        run: |
+          curl -X POST \
+            -H "X-Admin-Token: ${{ secrets.ADMIN_TOKEN }}" \
+            -m 120 \
+            https://farmacias-cl-api.onrender.com/api/admin/scrape-top

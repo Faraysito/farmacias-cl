@@ -1,6 +1,3 @@
-Te dejo un README profesional. Reemplaza el `README.md` actual del root del proyecto con esto:
-
-```markdown
 # Comparador de Farmacias Chile
 
 > Plataforma para comparar precios de medicamentos entre las principales cadenas farmacéuticas de Chile (Cruz Verde, Salcobrand y Ahumada), agrupados por principio activo y dosis.

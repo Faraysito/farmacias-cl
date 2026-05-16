@@ -92,6 +92,7 @@ Cada scrape inserta una fila por (medicamento, farmacia) **solo si no existe ya 
 ---
 
 ## Estructura del proyecto
+~~~
 farmacias-cl/
 ├── README.md
 ├── docker-compose.yml          # Postgres + Redis para dev local
@@ -132,15 +133,15 @@ farmacias-cl/
 │       ├── reset_y_scrape.py   # Limpia DB y rescrapea desde 0
 │       └── test_normalizador.py
 └── frontend/
-├── package.json
-├── astro.config.mjs
-├── tailwind.config.mjs
-└── src/
-├── pages/
-│   └── index.astro     # Home + buscador + resultados + modal histórico
-└── styles/
-└── global.css
----
+    ├── package.json
+    ├── astro.config.mjs
+    ├── tailwind.config.mjs
+    └── src/
+        ├── pages/
+        │   └── index.astro     # Home + buscador + resultados + modal histórico
+        └── styles/
+            └── global.css
+~~~
 
 ## Setup local
 

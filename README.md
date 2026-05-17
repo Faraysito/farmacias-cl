@@ -341,6 +341,3 @@ UptimeRobot pinga `https://farmacias-cl-api.onrender.com` cada 5 min. Sin esto, 
 
 ---
 
-## Licencia
-
-MIT

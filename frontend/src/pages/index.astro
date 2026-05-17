@@ -440,16 +440,13 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
           },
 
           async init() {
-            try {
-              if (!localStorage.getItem("avisoVisto")) this.aviso.abierto = true;
-            } catch(e) { this.aviso.abierto = true; }
-            this.cargarHome();
-          },
+  this.aviso.abierto = true;
+  this.cargarHome();
+},
 
           cerrarAviso() {
-            this.aviso.abierto = false;
-            try { localStorage.setItem("avisoVisto", "1"); } catch(e) {}
-          },
+  this.aviso.abierto = false;
+},
 
           async cargarHome() {
             try {

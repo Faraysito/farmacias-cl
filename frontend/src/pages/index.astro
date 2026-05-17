@@ -278,8 +278,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
           <template x-for="cat in categorias" :key="cat.id">
             <button
               @click="query = cat.query; buscar()"
-              class="group relative overflow-hidden rounded-2xl p-5 text-left transition-all hover:scale-105 hover:shadow-xl"
-              :class="`bg-gradient-to-br ${cat.color}`"
+              class="group relative overflow-hidden rounded-2xl p-5 text-left transition-all hover:scale-105 hover:shadow-xl bg-gradient-to-br from-emerald-600 to-teal-600"
             >
               <div class="text-4xl mb-3" x-text="cat.icono"></div>
               <div class="text-white font-bold text-lg" x-text="cat.nombre"></div>

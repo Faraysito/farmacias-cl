@@ -48,7 +48,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </header>
 
-    <!-- ============ NOTA DEV (una vez) ============ -->
+    <!-- ============ NOTA DEV (siempre al entrar) ============ -->
     <div
       x-show="aviso"
       x-transition.opacity
@@ -471,7 +471,7 @@ import Base from "../layouts/Base.astro";
           this.cargarHome();
           const q = new URLSearchParams(location.search).get("q");
           if (q) { this.query = q; this.buscar(false); }
-          else { try { if (!localStorage.getItem("aviso_visto")) this.aviso = true; } catch(e) { this.aviso = true; } }
+          this.aviso = true;
           window.addEventListener("popstate", () => {
             const nq = new URLSearchParams(location.search).get("q");
             if (nq) { this.query = nq; this.buscar(false); }
@@ -479,7 +479,7 @@ import Base from "../layouts/Base.astro";
           });
         },
         aviso: false,
-        cerrarAviso() { this.aviso = false; try { localStorage.setItem("aviso_visto","1"); } catch(e){} },
+        cerrarAviso() { this.aviso = false; },
 
         toggleTema() {
           this.esOscuro = !this.esOscuro;

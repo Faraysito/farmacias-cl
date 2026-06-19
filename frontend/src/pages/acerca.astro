@@ -1,0 +1,48 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Acerca · Comparador de Farmacias Chile" description="Por qué existe este comparador de precios de medicamentos y cómo está construido.">
+  <header class="sticky top-0 z-40 backdrop-blur" style="background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom:1px solid var(--hairline)">
+    <div class="max-w-2xl mx-auto px-4 h-16 flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2" aria-label="Inicio">
+        <img src="/favicon.svg" alt="" width="28" height="28" />
+        <span class="font-display font-extrabold text-lg tracking-tight">Remedios<span style="color: var(--accent)">.cl</span></span>
+      </a>
+      <a href="/" class="ml-auto text-sm hover:underline" style="color: var(--fg-soft)">← Volver</a>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-4 py-12">
+    <h1 class="font-display text-4xl font-extrabold mb-4">Por qué existe esto</h1>
+    <p class="text-lg leading-relaxed mb-6" style="color: var(--fg-soft)">En Chile el mismo medicamento puede costar hasta <strong style="color: var(--fg)">20 veces más</strong> según la cadena y la marca. Un Losartán 50 mg va desde <span class="font-mono font-bold" style="color: var(--accent)">$1.495</span> hasta <span class="font-mono font-bold" style="color: var(--warn)">$32.207</span> por el mismo principio activo. Nadie compara porque cada cadena tiene su sitio, sus nombres comerciales y sus laboratorios.</p>
+    <p class="leading-relaxed mb-10" style="color: var(--fg-soft)">Este sitio resuelve eso: una búsqueda, las tres cadenas lado a lado, agrupadas por principio activo para que veas todas las alternativas —incluyendo bioequivalentes más baratos— y el ahorro exacto.</p>
+
+    <h2 class="font-display text-2xl font-extrabold mb-4">Cómo está construido</h2>
+    <div class="surface rounded-2xl p-6 mb-6 text-sm leading-relaxed" style="color: var(--fg-soft)">
+      <p class="mb-2"><strong style="color: var(--fg)">Backend</strong> — Python · FastAPI · SQLAlchemy · Alembic · PostgreSQL + PostGIS (Neon)</p>
+      <p class="mb-2"><strong style="color: var(--fg)">Scraping</strong> — Playwright (Cruz Verde), Algolia API (Salcobrand), httpx + BeautifulSoup (Ahumada)</p>
+      <p class="mb-2"><strong style="color: var(--fg)">Frontend</strong> — Astro · Tailwind CSS · Alpine.js · Chart.js</p>
+      <p><strong style="color: var(--fg)">Infra</strong> — Vercel · Render · GitHub Actions (scrape nocturno)</p>
+    </div>
+
+    <h2 class="font-display text-2xl font-extrabold mb-4">Decisiones técnicas</h2>
+    <div class="space-y-5 mb-10">
+      <div><h3 class="font-display font-bold mb-1">Cada cadena, una técnica distinta</h3><p class="text-sm leading-relaxed" style="color: var(--fg-soft)">Cruz Verde está protegida por Imperva, así que se usa un navegador real (Playwright). Salcobrand expone su buscador Algolia, que se consulta directo. Ahumada renderiza en servidor y basta con parsear el HTML.</p></div>
+      <div><h3 class="font-display font-bold mb-1">Scraping bajo demanda</h3><p class="text-sm leading-relaxed" style="color: var(--fg-soft)">Si buscas algo que no está en la base, se scrapean las cadenas, se guarda y se devuelve. La primera vez tarda; las siguientes son instantáneas.</p></div>
+      <div><h3 class="font-display font-bold mb-1">Un punto de precio por día</h3><p class="text-sm leading-relaxed" style="color: var(--fg-soft)">Cada scrape guarda una sola lectura por medicamento y cadena al día, lo que permite construir el histórico sin ruido.</p></div>
+    </div>
+
+    <h2 class="font-display text-2xl font-extrabold mb-4">Aviso</h2>
+    <p class="text-sm leading-relaxed mb-10" style="color: var(--fg-faint)">Los precios son referenciales y provienen de los sitios públicos de cada cadena; pueden no estar actualizados o diferir en tienda. Este sitio no vende medicamentos ni entrega consejo médico. Ante cualquier duda sobre tu tratamiento, consulta a un profesional de la salud o a tu químico farmacéutico.</p>
+
+    <a href="/" class="inline-block px-5 py-3 text-white font-semibold rounded-xl" style="background: var(--accent)">Comparar precios →</a>
+  </main>
+
+  <footer class="py-10 mt-10" style="border-top:1px solid var(--hairline)">
+    <div class="max-w-2xl mx-auto px-4 text-sm flex flex-wrap items-center justify-between gap-4" style="color: var(--fg-faint)">
+      <span>Comparador de Farmacias Chile</span>
+      <a href="https://github.com/Faraysito/farmacias-cl" target="_blank" rel="noopener" class="hover:underline">Código en GitHub</a>
+    </div>
+  </footer>
+</Base>

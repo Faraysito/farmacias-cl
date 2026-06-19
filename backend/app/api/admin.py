@@ -1,6 +1,9 @@
-import os
 import asyncio
-from fastapi import APIRouter, Header, HTTPException, BackgroundTasks
+import secrets
+
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
+
+from app.config import ADMIN_TOKEN
 from app.scrape_orchestrator import scrape_todas
 
 router = APIRouter()
@@ -12,11 +15,11 @@ TOP_MEDICAMENTOS = [
 ]
 
 
-def _verificar_token(token: str | None):
-    expected = os.getenv("ADMIN_TOKEN")
-    if not expected:
+def _verificar_token(token: str | None) -> None:
+    if not ADMIN_TOKEN:
         raise HTTPException(500, "ADMIN_TOKEN no configurado en el server")
-    if token != expected:
+    # Comparación en tiempo constante para no filtrar el token por timing.
+    if not token or not secrets.compare_digest(token, ADMIN_TOKEN):
         raise HTTPException(401, "token inválido")
 
 
@@ -31,7 +34,7 @@ async def scrape_top(
     return {"ok": True, "encolados": len(TOP_MEDICAMENTOS)}
 
 
-async def _correr_scrapes():
+async def _correr_scrapes() -> None:
     resumen_total = {}
     for med in TOP_MEDICAMENTOS:
         try:

@@ -1,662 +1,671 @@
 ---
-import "../styles/global.css";
-
-const title = "Comparador de Farmacias Chile";
-const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
+import Base from "../layouts/Base.astro";
 ---
 
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>{title}</title>
-    <script is:inline src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script is:inline src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script is:inline set:html={`window.API_URL = "${API_URL}";`}></script>
-  </head>
-  <body class="bg-slate-50 min-h-screen">
-    <div x-data="app()" x-init="init()">
+<Base withChart={true}>
+  <div x-data="app()" x-init="init()" class="min-h-screen">
+    <!-- ============ HEADER ============ -->
+    <header
+      class="sticky top-0 z-40 backdrop-blur"
+      style="background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--hairline);"
+    >
+      <div class="max-w-5xl mx-auto px-4 h-16 flex items-center gap-4">
+        <a href="/" class="flex items-center gap-2 shrink-0" aria-label="Inicio">
+          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <span class="font-display font-extrabold text-lg tracking-tight hidden sm:block"
+            >Remedios<span style="color: var(--accent)">.cl</span></span
+          >
+        </a>
 
-      <!-- MODAL AVISO DEV -->
-      <div x-show="aviso.abierto"
-           x-transition.opacity
-           @keydown.escape.window="cerrarAviso()"
-           class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-           style="display: none">
-        <div @click.outside="cerrarAviso()"
-             class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-7 max-h-[90vh] overflow-auto">
-          <span class="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold uppercase tracking-wide mb-4">
-            Nota del desarrollador
-          </span>
-          <h2 class="text-2xl font-bold text-slate-900 mb-3">Un poco de contexto</h2>
-          <p class="text-slate-700 mb-4 leading-relaxed">
-            Este es un comparador de precios de medicamentos entre Cruz Verde, Salcobrand y Ahumada.
-            Sigue en desarrollo, así que tendrá actualizaciones en diseño y funcionalidades.
-          </p>
-          <p class="text-sm text-slate-600 mb-4 leading-relaxed">
-            <span class="font-semibold text-slate-900">Frontend:</span> Astro · Tailwind · Alpine.js · Chart.js<br>
-            <span class="font-semibold text-slate-900">Backend:</span> Python · FastAPI · SQLAlchemy · Alembic · Playwright<br>
-            <span class="font-semibold text-slate-900">Base de datos:</span> PostgreSQL + PostGIS (Neon)<br>
-            <span class="font-semibold text-slate-900">Despliegue:</span> Vercel · Render · Neon · GitHub Actions
-          </p>
-          <p class="text-sm text-slate-600 mb-3 leading-relaxed">
-            La primera búsqueda puede tardar ~40 segundos: cuando no hay tráfico, Render entra en reposo (coldstart del free tier) y demora en despertar.
-          </p>
-          <p class="text-sm text-slate-600 mb-5 leading-relaxed">
-            Una vez activo, las siguientes búsquedas son instantáneas porque quedan cacheadas en DB.
-          </p>
-          <button @click="cerrarAviso()"
-                  class="w-full px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl transition-all shadow-lg">
-            VEAMOS LA PÁGINA →
+        <!-- buscador compacto: aparece al hacer scroll -->
+        <div class="flex-1 max-w-md mx-auto" x-show="yaBusque" x-transition.opacity>
+          <div class="relative">
+            <input
+              type="text"
+              x-model="query"
+              @keyup.enter="cerrarSug(); buscar()"
+              @input.debounce.250ms="pedirSugerencias()"
+              placeholder="Buscar otro remedio…"
+              aria-label="Buscar medicamento"
+              class="w-full pl-9 pr-3 py-2 text-sm surface rounded-xl outline-none"
+              style="color: var(--fg)"
+            />
+            <svg class="absolute left-3 top-2.5 w-4 h-4" style="color: var(--fg-faint)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+        </div>
+
+        <nav class="flex items-center gap-1 ml-auto shrink-0">
+          <a href="/acerca" class="px-3 py-2 text-sm rounded-lg hover:bg-[var(--accent-tint)] transition-colors" style="color: var(--fg-soft)">Acerca</a>
+          <button
+            @click="toggleTema()"
+            class="p-2 rounded-lg hover:bg-[var(--accent-tint)] transition-colors"
+            :aria-label="esOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'"
+          >
+            <svg x-show="!esOscuro" class="w-5 h-5" style="color: var(--fg-soft)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
+            <svg x-show="esOscuro" class="w-5 h-5" style="color: var(--fg-soft)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
           </button>
-        </div>
+        </nav>
       </div>
+    </header>
 
-      <!-- HERO -->
-      <section class="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 text-white">
-        <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 80%, white 1px, transparent 1px); background-size: 40px 40px;"></div>
-
-        <div class="relative max-w-5xl mx-auto px-4 py-12 md:py-16">
-          <div class="text-center mb-8">
-            <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur rounded-full text-xs font-medium mb-4 border border-white/20">
-              <span class="w-2 h-2 bg-emerald-300 rounded-full animate-pulse"></span>
-              Precios actualizados en tiempo real
-            </div>
-            <h1 class="text-4xl md:text-5xl font-bold mb-3 tracking-tight">
-              Encuentra tu medicamento <span class="text-emerald-200">al mejor precio</span>
-            </h1>
-            <p class="text-lg text-emerald-50/90 max-w-2xl mx-auto">
-              Comparamos Cruz Verde, Salcobrand y Ahumada en una sola búsqueda
-            </p>
-          </div>
-
-          <div class="max-w-2xl mx-auto">
-            <div class="relative">
-              <div class="flex gap-2 p-2 bg-white rounded-2xl shadow-2xl">
-                <input
-                  type="text"
-                  x-model="query"
-                  @input.debounce.250ms="pedirSugerencias()"
-                  @keyup.enter="cerrarSug(); buscar()"
-                  @keydown.arrow-down.prevent="navSug(1)"
-                  @keydown.arrow-up.prevent="navSug(-1)"
-                  @keydown.escape="cerrarSug()"
-                  @focus="if (sugerencias.length) sugAbierto = true"
-                  @click.outside="cerrarSug()"
-                  placeholder="Buscar medicamento (ej: losartan, paracetamol)"
-                  class="flex-1 px-4 py-3 text-slate-900 placeholder-slate-400 outline-none rounded-xl"
-                  autocomplete="off"
-                />
-                <button
-                  @click="cerrarSug(); buscar()"
-                  :disabled="loading"
-                  class="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg"
-                >
-                  <span x-show="!loading">🔍 Buscar</span>
-                  <span x-show="loading">Buscando...</span>
-                </button>
-              </div>
-
-              <div x-show="sugAbierto && sugerencias.length > 0"
-                   x-transition
-                   class="absolute left-2 right-2 mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-20">
-                <template x-for="(s, i) in sugerencias" :key="s.valor + s.tipo">
-                  <button
-                    @click="query = s.valor; cerrarSug(); buscar()"
-                    @mouseenter="sugIndex = i"
-                    class="w-full text-left px-4 py-2 flex items-center justify-between text-slate-800 hover:bg-emerald-50 transition-colors"
-                    :class="i === sugIndex ? 'bg-emerald-50' : ''"
-                  >
-                    <span class="truncate" x-text="s.valor"></span>
-                    <span class="text-[10px] uppercase tracking-wide ml-2 shrink-0"
-                          :class="s.tipo === 'principio' ? 'text-emerald-700' : 'text-slate-400'"
-                          x-text="s.tipo"></span>
-                  </button>
-                </template>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2 justify-center mt-4">
-              <template x-for="c in ['losartan', 'paracetamol', 'ibuprofeno', 'omeprazol', 'atorvastatina']">
-                <button
-                  @click="query = c; cerrarSug(); buscar()"
-                  class="px-3 py-1 bg-white/10 backdrop-blur hover:bg-white/20 border border-white/20 rounded-full text-sm transition-all"
-                  x-text="c"
-                ></button>
-              </template>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 max-w-3xl mx-auto" x-show="stats">
-            <div class="text-center">
-              <div class="text-3xl font-bold" x-text="stats?.medicamentos || '...'"></div>
-              <div class="text-xs text-emerald-100 uppercase tracking-wide mt-1">Medicamentos</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold" x-text="stats?.precios || '...'"></div>
-              <div class="text-xs text-emerald-100 uppercase tracking-wide mt-1">Precios</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold" x-text="stats?.principios_activos || '...'"></div>
-              <div class="text-xs text-emerald-100 uppercase tracking-wide mt-1">Principios activos</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold">3</div>
-              <div class="text-xs text-emerald-100 uppercase tracking-wide mt-1">Cadenas</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- RESULTADOS -->
-      <section x-show="yaBusque || loading" class="max-w-5xl mx-auto px-4 py-8">
-        <template x-if="loading && lentoOnDemand">
-          <div class="p-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-sm mb-4">
-            🔍 Buscando precios en tiempo real. Esto puede hasta 40 segundos por el coldstart de Render (hostprivado)
-          </div>
-        </template>
-
-        <template x-if="error">
-          <div class="p-4 bg-red-50 text-red-700 rounded-lg" x-text="error"></div>
-        </template>
-
-        <template x-if="!loading && grupos.length === 0 && yaBusque">
-          <div class="text-center py-12 text-slate-500">
-            Sin resultados para "<span x-text="ultimaQuery"></span>"
-          </div>
-        </template>
-
-        <template x-if="grupos.length > 0">
-          <div>
-            <div class="bg-white border border-slate-200 rounded-xl p-4 mb-4 flex flex-wrap items-center gap-4">
-              <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                <input type="checkbox" x-model="filtros.soloBio" class="rounded text-emerald-600">
-                Solo bioequivalentes
-              </label>
-
-              <div class="flex items-center gap-2 text-sm text-slate-700">
-                <span>Cadena:</span>
-                <template x-for="c in ['cruzverde','salcobrand','ahumada']" :key="c">
-                  <button
-                    @click="toggleCadena(c)"
-                    class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border"
-                    :class="filtros.cadenas.includes(c) ? claseDeCadena(c) + ' border-transparent' : 'bg-white text-slate-400 border-slate-300'"
-                    x-text="labelDeCadena(c)"
-                  ></button>
-                </template>
-              </div>
-
-              <div class="flex items-center gap-2 text-sm text-slate-700">
-                <span>Precio máx:</span>
-                <input
-                  type="number"
-                  x-model.number="filtros.precioMax"
-                  placeholder="sin límite"
-                  min="0"
-                  step="500"
-                  class="w-28 px-2 py-1 border border-slate-300 rounded text-sm outline-none focus:border-emerald-500"
-                >
-              </div>
-
-              <button @click="limpiarFiltros()" class="text-xs text-slate-500 hover:text-slate-700 underline ml-auto">
-                limpiar
-              </button>
-            </div>
-
-            <div class="text-sm text-slate-500 mb-3">
-              <span x-text="gruposFiltrados().length"></span> grupos para "<span x-text="ultimaQuery" class="font-semibold text-slate-700"></span>" · ordenados por precio mínimo
-            </div>
-
-            <div class="space-y-6">
-              <template x-for="g in gruposFiltrados()" :key="g.principio_activo + (g.dosis || '')">
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-baseline justify-between flex-wrap gap-2">
-                    <div>
-                      <h2 class="text-lg font-bold text-slate-900 capitalize" x-text="g.principio_activo"></h2>
-                      <span class="text-sm text-slate-500" x-text="g.dosis || 'dosis variable'"></span>
-                    </div>
-                    <div class="text-xs text-slate-500">
-                      <span x-text="filasDe(g).length"></span> ofertas
-                    </div>
-                  </div>
-
-                  <div class="divide-y divide-slate-100">
-                    <template x-for="(fila, i) in filasDe(g)" :key="fila.med_id + '-' + fila.cadena">
-                      <div class="px-5 py-3 flex items-center gap-4 flex-wrap" :class="i === 0 ? 'bg-emerald-50/50' : ''">
-                        <div class="flex-1 min-w-0">
-                          <div class="flex items-center gap-2 flex-wrap">
-                            <span class="font-medium text-slate-900 truncate" x-text="fila.nombre"></span>
-                            <template x-if="i === 0">
-                              <span class="px-2 py-0.5 bg-emerald-600 text-white rounded text-[10px] font-bold tracking-wide">
-                                MÁS BARATO
-                              </span>
-                            </template>
-                            <template x-if="fila.es_bio">
-                              <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
-                                BIOEQUIVALENTE
-                              </span>
-                            </template>
-                          </div>
-                          <div class="text-xs text-slate-500 mt-0.5">
-                            <span x-text="fila.laboratorio || ''"></span>
-                          </div>
-                        </div>
-
-                        <div class="flex items-center gap-3 shrink-0">
-                          <span class="px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide" :class="claseDeCadena(fila.cadena)" x-text="labelDeCadena(fila.cadena)"></span>
-                          <div class="text-xl font-bold text-slate-900 w-24 text-right" x-text="formatearPrecio(fila.precio)"></div>
-                          <button
-                            @click="abrirHistorico(fila.med_id, fila.nombre)"
-                            class="px-2 py-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors text-xs"
-                            title="Ver histórico de precios"
-                          >📈</button>
-                          <template x-if="fila.url">
-                            <a :href="fila.url" target="_blank" rel="noopener"
-                               class="px-3 py-1.5 bg-slate-900 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors">
-                              Comprar →
-                            </a>
-                          </template>
-                        </div>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
-        </template>
-      </section>
-
-      <!-- CATEGORÍAS -->
-      <section x-show="!yaBusque" class="max-w-5xl mx-auto px-4 py-12">
-        <div class="mb-8 text-center">
-          <h2 class="text-2xl md:text-3xl font-bold text-slate-900">Busca por categoría</h2>
-          <p class="text-slate-600 mt-2">Las condiciones más consultadas en farmacias chilenas</p>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <template x-for="cat in categorias" :key="cat.id">
-            <button
-              @click="query = cat.query; buscar()"
-              class="group relative overflow-hidden rounded-2xl p-5 text-left transition-all hover:scale-105 hover:shadow-xl bg-gradient-to-br from-emerald-600 to-teal-600"
-            >
-              <div class="text-4xl mb-3" x-text="cat.icono"></div>
-              <div class="text-white font-bold text-lg" x-text="cat.nombre"></div>
-              <div class="text-white/80 text-xs mt-1">ej: <span x-text="cat.query"></span></div>
-              <div class="absolute top-3 right-3 text-white/40 group-hover:text-white/80 transition-colors">→</div>
-            </button>
-          </template>
-        </div>
-      </section>
-
-      <!-- TOP -->
-      <section x-show="!yaBusque && top.length > 0" class="max-w-5xl mx-auto px-4 py-12">
-        <div class="mb-8 text-center">
-          <h2 class="text-2xl md:text-3xl font-bold text-slate-900">🔥 Más buscados</h2>
-          <p class="text-slate-600 mt-2">Medicamentos con mejor precio actualmente</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <template x-for="med in top" :key="med.id">
-            <button
-              @click="query = med.principio_activo; buscar()"
-              class="group bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-emerald-400 hover:shadow-lg transition-all"
-            >
-              <div class="flex items-start justify-between mb-2">
-                <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-wide" x-text="med.principio_activo"></span>
-                <template x-if="med.es_bioequivalente">
-                  <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">BIO</span>
-                </template>
-              </div>
-              <div class="font-medium text-slate-900 truncate group-hover:text-emerald-700" x-text="med.nombre_comercial"></div>
-              <div class="text-xs text-slate-500 mt-1" x-text="med.laboratorio || med.dosis"></div>
-              <div class="mt-3 pt-3 border-t border-slate-100 flex items-end justify-between">
-                <div>
-                  <div class="text-[10px] text-slate-500 uppercase">desde</div>
-                  <div class="text-xl font-bold text-emerald-600" x-text="formatearPrecio(med.precio_min)"></div>
-                </div>
-                <div class="text-xs text-slate-400" x-text="med.n_cadenas + (med.n_cadenas === 1 ? ' cadena' : ' cadenas')"></div>
-              </div>
-            </button>
-          </template>
-        </div>
-      </section>
-
-      <!-- CÓMO FUNCIONA -->
-      <section x-show="!yaBusque" class="bg-white border-t border-slate-200 py-16">
-        <div class="max-w-5xl mx-auto px-4">
-          <div class="mb-10 text-center">
-            <h2 class="text-2xl md:text-3xl font-bold text-slate-900">Cómo funciona</h2>
-            <p class="text-slate-600 mt-2">Tres pasos. Sin registros, sin ads.</p>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="text-center">
-              <div class="w-16 h-16 mx-auto bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-4 shadow-lg">1</div>
-              <h3 class="font-bold text-slate-900 mb-2">Buscas tu medicamento</h3>
-              <p class="text-sm text-slate-600">Por nombre comercial o principio activo</p>
-            </div>
-            <div class="text-center">
-              <div class="w-16 h-16 mx-auto bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-4 shadow-lg">2</div>
-              <h3 class="font-bold text-slate-900 mb-2">Comparamos las cadenas</h3>
-              <p class="text-sm text-slate-600">Cruz Verde, Salcobrand y Ahumada en paralelo</p>
-            </div>
-            <div class="text-center">
-              <div class="w-16 h-16 mx-auto bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-4 shadow-lg">3</div>
-              <h3 class="font-bold text-slate-900 mb-2">Ahorras dinero</h3>
-              <p class="text-sm text-slate-600">Ves el más barato y los bioequivalentes</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- MODAL HISTÓRICO -->
-      <div x-show="historico.abierto"
-           x-transition.opacity
-           @keydown.escape.window="cerrarHistorico()"
-           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-           style="display: none">
-        <div @click.outside="cerrarHistorico()"
-             class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <h3 class="text-lg font-bold text-slate-900">Histórico de precios</h3>
-              <p class="text-sm text-slate-600" x-text="historico.nombre"></p>
-            </div>
-            <button @click="cerrarHistorico()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">×</button>
-          </div>
-
-          <div class="p-6 flex-1 overflow-auto">
-            <template x-if="historico.cargando">
-              <div class="text-center py-12 text-slate-500">Cargando datos...</div>
-            </template>
-
-            <template x-if="!historico.cargando && historico.sinDatos">
-              <div class="text-center py-12 text-slate-500">
-                Aún no hay suficiente historial para este medicamento.<br>
-                <span class="text-xs">Vuelve en unos días.</span>
-              </div>
-            </template>
-
-            <template x-if="!historico.cargando && !historico.sinDatos">
-              <div>
-                <canvas id="grafico-historico" style="max-height: 400px;"></canvas>
-                <p class="text-xs text-slate-500 mt-4 text-center">Últimos 90 días</p>
-              </div>
-            </template>
-          </div>
-        </div>
+    <!-- ============ NOTA DEV (una vez) ============ -->
+    <div
+      x-show="aviso"
+      x-transition.opacity
+      @keydown.escape.window="cerrarAviso()"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style="background: rgba(0,0,0,.55); backdrop-filter: blur(4px); display:none"
+    >
+      <div @click.outside="cerrarAviso()" class="surface rounded-2xl shadow-2xl max-w-lg w-full p-7 rise">
+        <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide mb-4" style="background: var(--accent-tint); color: var(--accent)">Nota del desarrollador</span>
+        <h2 class="font-display text-2xl font-extrabold mb-3">Cómo está montado esto</h2>
+        <p class="mb-4 leading-relaxed" style="color: var(--fg-soft)">Comparador de precios de medicamentos entre Cruz Verde, Salcobrand y Ahumada. Proyecto en desarrollo activo.</p>
+        <p class="text-sm mb-4 leading-relaxed" style="color: var(--fg-soft)">
+          <strong style="color: var(--fg)">Frontend:</strong> Astro · Tailwind · Alpine.js · Chart.js<br>
+          <strong style="color: var(--fg)">Backend:</strong> Python · FastAPI · SQLAlchemy · Playwright<br>
+          <strong style="color: var(--fg)">Datos:</strong> PostgreSQL + PostGIS (Neon)<br>
+          <strong style="color: var(--fg)">Infra:</strong> Vercel · Render · GitHub Actions
+        </p>
+        <p class="text-sm mb-5 leading-relaxed" style="color: var(--fg-faint)">La primera búsqueda puede tardar ~40 s: el backend en Render free entra en reposo y demora en despertar. Las siguientes son instantáneas (quedan cacheadas).</p>
+        <button @click="cerrarAviso()" class="w-full px-5 py-3 text-white font-semibold rounded-xl transition-all" style="background: var(--accent)">Entendido, ver la página →</button>
       </div>
-
-      <footer class="bg-slate-900 text-slate-400 py-8">
-        <div class="max-w-5xl mx-auto px-4 text-center text-sm">
-          <p class="mb-2">Proyecto open source · FastAPI + Astro + PostgreSQL</p>
-        </div>
-      </footer>
-
     </div>
 
-    <script is:inline>
-      const CADENAS_META = {
-        cruzverde: { label: "Cruz Verde", clase: "bg-green-100 text-green-800" },
-        salcobrand: { label: "Salcobrand", clase: "bg-orange-100 text-orange-800" },
-        ahumada: { label: "Ahumada", clase: "bg-red-100 text-red-800" },
-      };
+    <!-- ============ HERO ============ -->
+    <section x-show="!yaBusque" class="max-w-5xl mx-auto px-4 pt-12 md:pt-20 pb-10">
+      <div class="max-w-3xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-6" style="background: var(--accent-tint); color: var(--accent)">
+          <span class="w-1.5 h-1.5 rounded-full" style="background: var(--accent-bright)"></span>
+          Cruz Verde · Salcobrand · Ahumada
+        </div>
+        <h1 class="font-display text-4xl md:text-6xl font-extrabold leading-[1.05] mb-5">
+          El mismo remedio,<br><span style="color: var(--accent)">hasta 20× más barato.</span>
+        </h1>
+        <p class="text-lg md:text-xl leading-relaxed mb-8" style="color: var(--fg-soft)">
+          Un Losartán 50 mg va desde <span class="font-mono font-bold" style="color: var(--accent)">$1.495</span> hasta <span class="font-mono font-bold" style="color: var(--warn)">$32.207</span> según la cadena y la marca. Búscalo una vez y compara las tres, con bioequivalentes incluidos.
+        </p>
 
-      function app() {
-        return {
-          query: "",
-          ultimaQuery: "",
-          grupos: [],
-          loading: false,
-          lentoOnDemand: false,
-          error: "",
-          yaBusque: false,
-          categorias: [],
-          top: [],
-          stats: null,
+        <!-- buscador -->
+        <div class="relative max-w-2xl">
+          <div class="flex gap-2 p-2 surface rounded-2xl shadow-sm">
+            <div class="relative flex-1">
+              <svg class="absolute left-3 top-3.5 w-5 h-5" style="color: var(--fg-faint)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                type="text"
+                x-model="query"
+                @input.debounce.250ms="pedirSugerencias()"
+                @keyup.enter="cerrarSug(); buscar()"
+                @keydown.arrow-down.prevent="navSug(1)"
+                @keydown.arrow-up.prevent="navSug(-1)"
+                @keydown.escape="cerrarSug()"
+                @focus="if (sugerencias.length) sugAbierto = true"
+                @click.outside="cerrarSug()"
+                placeholder="Escribe un medicamento: losartán, paracetamol…"
+                aria-label="Buscar medicamento"
+                autocomplete="off"
+                class="w-full pl-10 pr-3 py-3 bg-transparent outline-none"
+                style="color: var(--fg)"
+              />
+            </div>
+            <button
+              @click="cerrarSug(); buscar()"
+              :disabled="loading"
+              class="px-6 py-3 text-white font-semibold rounded-xl disabled:opacity-50 transition-all shrink-0"
+              style="background: var(--accent)"
+            >
+              <span x-show="!loading">Comparar</span>
+              <span x-show="loading">Buscando…</span>
+            </button>
+          </div>
 
-          sugerencias: [],
-          sugAbierto: false,
-          sugIndex: -1,
+          <!-- autocomplete -->
+          <div x-show="sugAbierto && sugerencias.length > 0" x-transition class="absolute left-0 right-0 mt-2 surface rounded-xl shadow-2xl overflow-hidden z-20">
+            <template x-for="(s, i) in sugerencias" :key="s.valor + s.tipo">
+              <button
+                @click="query = s.valor; cerrarSug(); buscar()"
+                @mouseenter="sugIndex = i"
+                class="w-full text-left px-4 py-2.5 flex items-center justify-between transition-colors"
+                :style="i === sugIndex ? 'background: var(--accent-tint)' : ''"
+              >
+                <span class="truncate" x-text="s.valor" style="color: var(--fg)"></span>
+                <span class="text-[10px] uppercase tracking-wide ml-2 shrink-0" :style="s.tipo === 'principio' ? 'color: var(--accent)' : 'color: var(--fg-faint)'" x-text="s.tipo"></span>
+              </button>
+            </template>
+          </div>
+        </div>
 
-          filtros: {
-            soloBio: false,
-            cadenas: ["cruzverde", "salcobrand", "ahumada"],
-            precioMax: null,
-          },
+        <!-- chips -->
+        <div class="flex flex-wrap gap-2 mt-4">
+          <template x-for="c in ['losartan','paracetamol','ibuprofeno','omeprazol','atorvastatina']">
+            <button @click="query = c; cerrarSug(); buscar()" class="px-3 py-1.5 surface rounded-full text-sm transition-all hover:border-[var(--accent)]" style="color: var(--fg-soft)" x-text="c"></button>
+          </template>
+        </div>
 
-          historico: {
-            abierto: false,
-            cargando: false,
-            sinDatos: false,
-            nombre: "",
-            chart: null,
-          },
+        <!-- stats -->
+        <div class="grid grid-cols-3 gap-px mt-12 surface rounded-2xl overflow-hidden" x-show="stats">
+          <div class="p-5 text-center">
+            <div class="font-mono text-2xl md:text-3xl font-bold tnum" x-text="stats?.medicamentos ?? '—'"></div>
+            <div class="text-xs uppercase tracking-wide mt-1" style="color: var(--fg-faint)">Medicamentos</div>
+          </div>
+          <div class="p-5 text-center" style="border-left:1px solid var(--hairline); border-right:1px solid var(--hairline)">
+            <div class="font-mono text-2xl md:text-3xl font-bold tnum" x-text="stats?.principios_activos ?? '—'"></div>
+            <div class="text-xs uppercase tracking-wide mt-1" style="color: var(--fg-faint)">Principios activos</div>
+          </div>
+          <div class="p-5 text-center">
+            <div class="font-mono text-2xl md:text-3xl font-bold tnum">3</div>
+            <div class="text-xs uppercase tracking-wide mt-1" style="color: var(--fg-faint)">Cadenas</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-          aviso: {
-            abierto: false,
-          },
+    <!-- ============ RESULTADOS ============ -->
+    <section x-show="yaBusque || loading" class="max-w-5xl mx-auto px-4 py-8">
+      <!-- aviso coldstart -->
+      <template x-if="loading && lentoOnDemand">
+        <div class="p-4 rounded-xl text-sm mb-4" style="background: var(--accent-tint); color: var(--accent)">Buscando precios en vivo. Puede tardar hasta 40 s por el arranque del servidor.</div>
+      </template>
 
-          async init() {
-  this.aviso.abierto = true;
-  this.cargarHome();
-},
+      <!-- skeletons -->
+      <template x-if="loading">
+        <div class="space-y-4">
+          <template x-for="n in 3" :key="n">
+            <div class="surface rounded-2xl p-5">
+              <div class="skeleton h-6 w-40 mb-4"></div>
+              <div class="space-y-3">
+                <div class="skeleton h-12 w-full"></div>
+                <div class="skeleton h-12 w-full"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
 
-          cerrarAviso() {
-  this.aviso.abierto = false;
-},
+      <template x-if="error">
+        <div class="p-4 rounded-xl" style="background: var(--warn-tint); color: var(--warn)" x-text="error"></div>
+      </template>
 
-          async cargarHome() {
-            try {
-              const [cR, tR, sR] = await Promise.all([
-                fetch(`${window.API_URL}/api/home/categorias`),
-                fetch(`${window.API_URL}/api/home/top`),
-                fetch(`${window.API_URL}/api/home/stats`),
-              ]);
-              if (cR.ok) this.categorias = await cR.json();
-              if (tR.ok) this.top = await tR.json();
-              if (sR.ok) this.stats = await sR.json();
-            } catch (e) {
-              console.warn("home falló", e);
-            }
-          },
+      <template x-if="!loading && grupos.length === 0 && yaBusque && !error">
+        <div class="text-center py-16">
+          <div class="font-display text-xl font-bold mb-2">Sin resultados para “<span x-text="ultimaQuery"></span>”</div>
+          <p style="color: var(--fg-soft)">Prueba con el principio activo (ej: <button class="underline" @click="query='losartan'; buscar()">losartán</button>) en vez del nombre comercial.</p>
+        </div>
+      </template>
 
-          async pedirSugerencias() {
-            const q = this.query.trim();
-            if (q.length < 2) {
-              this.sugerencias = [];
-              this.sugAbierto = false;
-              return;
-            }
-            try {
-              const r = await fetch(`${window.API_URL}/api/autocomplete?q=${encodeURIComponent(q)}`);
-              if (!r.ok) return;
-              this.sugerencias = await r.json();
-              this.sugAbierto = this.sugerencias.length > 0;
-              this.sugIndex = -1;
-            } catch (e) {
-              // ignore
-            }
-          },
+      <template x-if="!loading && grupos.length > 0">
+        <div>
+          <!-- barra de filtros -->
+          <div class="surface rounded-xl p-4 mb-5 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <label class="flex items-center gap-2 text-sm cursor-pointer" style="color: var(--fg-soft)">
+              <input type="checkbox" x-model="filtros.soloBio" class="accent-[var(--accent)]"> Solo bioequivalentes
+            </label>
+            <div class="flex items-center gap-2 text-sm" style="color: var(--fg-soft)">
+              <span>Cadena:</span>
+              <template x-for="c in ['cruzverde','salcobrand','ahumada']" :key="c">
+                <button @click="toggleCadena(c)" class="px-2 py-0.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-all" :class="filtros.cadenas.includes(c) ? chipCadena(c) : ''" :style="filtros.cadenas.includes(c) ? '' : 'border:1px solid var(--hairline); color: var(--fg-faint)'" x-text="labelCadena(c)"></button>
+              </template>
+            </div>
+            <div class="flex items-center gap-2 text-sm" style="color: var(--fg-soft)">
+              <span>Orden:</span>
+              <select x-model="filtros.orden" class="surface rounded-md px-2 py-1 text-sm outline-none" style="color: var(--fg)">
+                <option value="precio">Más barato</option>
+                <option value="ahorro">Mayor ahorro</option>
+              </select>
+            </div>
+            <button @click="compartir()" class="ml-auto flex items-center gap-1.5 text-sm transition-colors" style="color: var(--fg-soft)">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>
+              <span x-text="copiado ? '¡Enlace copiado!' : 'Compartir'"></span>
+            </button>
+          </div>
 
-          navSug(dir) {
-            if (!this.sugAbierto) return;
-            const max = this.sugerencias.length;
-            this.sugIndex = (this.sugIndex + dir + max) % max;
-            const s = this.sugerencias[this.sugIndex];
-            if (s) this.query = s.valor;
-          },
+          <div class="text-sm mb-4" style="color: var(--fg-faint)">
+            <span class="font-semibold" style="color: var(--fg)" x-text="gruposOrdenados().length"></span> grupos para “<span class="font-semibold" style="color: var(--fg)" x-text="ultimaQuery"></span>”
+          </div>
 
-          cerrarSug() {
-            this.sugAbierto = false;
+          <!-- tarjetas (price-ladder) -->
+          <div class="space-y-5">
+            <template x-for="(g, gi) in gruposOrdenados()" :key="g.principio_activo + (g.dosis || '')">
+              <div class="surface rounded-2xl overflow-hidden rise" :style="`animation-delay:${Math.min(gi*60,300)}ms`">
+                <!-- cabecera con AHORRO destacado -->
+                <div class="px-5 py-4 flex items-start justify-between gap-3 flex-wrap" style="border-bottom:1px solid var(--hairline)">
+                  <div>
+                    <h2 class="font-display text-xl font-extrabold capitalize" x-text="g.principio_activo"></h2>
+                    <div class="text-sm flex items-center gap-2 mt-0.5" style="color: var(--fg-faint)">
+                      <span x-text="g.dosis || 'dosis variable'"></span>
+                      <span x-show="g.actualizado">· actualizado <span x-text="relativo(g.actualizado)"></span></span>
+                    </div>
+                  </div>
+                  <template x-if="g.ahorro_abs && g.ahorro_pct >= 1">
+                    <div class="text-right">
+                      <div class="font-mono text-2xl font-bold tnum" style="color: var(--accent)" x-text="'−' + formatear(g.ahorro_abs)"></div>
+                      <div class="text-xs uppercase tracking-wide" style="color: var(--accent)"><span x-text="g.ahorro_pct"></span>% de ahorro</div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- filas: escalera de precios -->
+                <div>
+                  <template x-for="(fila, i) in filasDe(g)" :key="fila.med_id + '-' + fila.cadena">
+                    <div class="px-5 py-3 flex items-center gap-4 flex-wrap" :style="i ? 'border-top:1px solid var(--hairline)' : 'background: var(--accent-tint)'">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <a :href="`/medicamento?id=${fila.med_id}`" class="font-medium truncate hover:underline" style="color: var(--fg)" x-text="fila.nombre"></a>
+                          <template x-if="i === 0 && filasDe(g).length > 1">
+                            <span class="px-2 py-0.5 text-white rounded text-[10px] font-bold tracking-wide" style="background: var(--accent)">MÁS BARATO</span>
+                          </template>
+                          <template x-if="fila.es_bio">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-medium" style="background: var(--accent-tint); color: var(--accent)">BIOEQUIVALENTE</span>
+                          </template>
+                        </div>
+                        <div class="text-xs mt-1 flex items-center gap-2" style="color: var(--fg-faint)">
+                          <span x-text="fila.laboratorio || 'laboratorio s/i'"></span>
+                        </div>
+                        <!-- barra de spread -->
+                        <div class="mt-2 h-1.5 rounded-full overflow-hidden" style="background: var(--hairline); max-width:260px">
+                          <div class="h-full rounded-full" :style="`width:${fila.pct}%; background:${fila.color}`"></div>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center gap-3 shrink-0">
+                        <span class="px-2 py-1 rounded-md text-xs font-semibold uppercase tracking-wide" :class="chipCadena(fila.cadena)" x-text="labelCadena(fila.cadena)"></span>
+                        <div class="font-mono text-xl font-bold tnum w-24 text-right" :style="i===0 ? 'color: var(--accent)' : 'color: var(--fg)'" x-text="formatear(fila.precio)"></div>
+                        <button @click="abrirHistorico(fila.med_id, fila.nombre)" class="p-2 rounded-lg transition-colors hover:bg-[var(--accent-tint)]" style="color: var(--fg-faint)" title="Ver histórico de precios" aria-label="Ver histórico de precios">
+                          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+                        </button>
+                        <button @click="abrirAlerta(fila.med_id, fila.nombre, fila.precio)" class="p-2 rounded-lg transition-colors hover:bg-[var(--accent-tint)]" style="color: var(--fg-faint)" title="Avisarme si baja de precio" aria-label="Crear alerta de precio">
+                          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        </button>
+                        <template x-if="fila.url">
+                          <a :href="fila.url" target="_blank" rel="noopener" class="px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition-colors" style="background: var(--fg)">Comprar →</a>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- ============ CATEGORÍAS ============ -->
+    <section x-show="!yaBusque" class="max-w-5xl mx-auto px-4 py-12">
+      <h2 class="font-display text-2xl md:text-3xl font-extrabold mb-1">Busca por condición</h2>
+      <p class="mb-8" style="color: var(--fg-soft)">Las más consultadas en farmacias chilenas</p>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <template x-for="cat in categorias" :key="cat.id">
+          <button @click="query = cat.query; buscar()" class="group surface rounded-2xl p-5 text-left transition-all hover:border-[var(--accent)] hover:-translate-y-0.5">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style="background: var(--accent-tint); color: var(--accent)" x-html="iconoCategoria(cat.id)"></div>
+            <div class="font-display font-bold" x-text="cat.nombre"></div>
+            <div class="text-xs mt-1" style="color: var(--fg-faint)">ej: <span x-text="cat.query"></span></div>
+          </button>
+        </template>
+      </div>
+    </section>
+
+    <!-- ============ TOP ============ -->
+    <section x-show="!yaBusque && top.length > 0" class="max-w-5xl mx-auto px-4 py-12">
+      <h2 class="font-display text-2xl md:text-3xl font-extrabold mb-1">Mejores precios ahora</h2>
+      <p class="mb-8" style="color: var(--fg-soft)">Lo más barato disponible por principio activo</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <template x-for="med in top" :key="med.id">
+          <button @click="query = med.principio_activo; buscar()" class="group surface rounded-2xl p-4 text-left transition-all hover:border-[var(--accent)] hover:-translate-y-0.5">
+            <div class="flex items-start justify-between mb-2">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded uppercase tracking-wide" style="background: var(--accent-tint); color: var(--accent)" x-text="med.principio_activo"></span>
+              <template x-if="med.es_bioequivalente">
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background: var(--accent-tint); color: var(--accent)">BIO</span>
+              </template>
+            </div>
+            <div class="font-medium truncate" style="color: var(--fg)" x-text="med.nombre_comercial"></div>
+            <div class="text-xs mt-1" style="color: var(--fg-faint)" x-text="med.laboratorio || med.dosis"></div>
+            <div class="mt-3 pt-3 flex items-end justify-between" style="border-top:1px solid var(--hairline)">
+              <div>
+                <div class="text-[10px] uppercase" style="color: var(--fg-faint)">desde</div>
+                <div class="font-mono text-xl font-bold tnum" style="color: var(--accent)" x-text="formatear(med.precio_min)"></div>
+              </div>
+              <div class="text-xs" style="color: var(--fg-faint)" x-text="med.n_cadenas + (med.n_cadenas === 1 ? ' cadena' : ' cadenas')"></div>
+            </div>
+          </button>
+        </template>
+      </div>
+    </section>
+
+    <!-- ============ CÓMO FUNCIONA (secuencia real → numeración justificada) ============ -->
+    <section x-show="!yaBusque" class="py-16" style="border-top:1px solid var(--hairline); background: var(--bg-surface)">
+      <div class="max-w-5xl mx-auto px-4">
+        <h2 class="font-display text-2xl md:text-3xl font-extrabold mb-10 text-center">Tres pasos. Sin registro, sin ads.</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div>
+            <div class="font-mono text-sm font-bold mb-2" style="color: var(--accent)">01</div>
+            <h3 class="font-display font-bold mb-1">Buscas el remedio</h3>
+            <p class="text-sm" style="color: var(--fg-soft)">Por nombre comercial o principio activo.</p>
+          </div>
+          <div>
+            <div class="font-mono text-sm font-bold mb-2" style="color: var(--accent)">02</div>
+            <h3 class="font-display font-bold mb-1">Comparamos las cadenas</h3>
+            <p class="text-sm" style="color: var(--fg-soft)">Cruz Verde, Salcobrand y Ahumada en paralelo, agrupado por principio activo.</p>
+          </div>
+          <div>
+            <div class="font-mono text-sm font-bold mb-2" style="color: var(--accent)">03</div>
+            <h3 class="font-display font-bold mb-1">Ahorras</h3>
+            <p class="text-sm" style="color: var(--fg-soft)">Ves el más barato, los bioequivalentes y el ahorro exacto.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MODAL HISTÓRICO ============ -->
+    <div x-show="historico.abierto" x-transition.opacity @keydown.escape.window="cerrarHistorico()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,.5); backdrop-filter: blur(4px); display:none" role="dialog" aria-modal="true" aria-label="Histórico de precios">
+      <div @click.outside="cerrarHistorico()" class="surface rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="px-6 py-4 flex items-center justify-between" style="border-bottom:1px solid var(--hairline)">
+          <div>
+            <h3 class="font-display text-lg font-bold">Histórico de precios</h3>
+            <p class="text-sm" style="color: var(--fg-soft)" x-text="historico.nombre"></p>
+          </div>
+          <button @click="cerrarHistorico()" class="text-2xl leading-none p-1" style="color: var(--fg-faint)" aria-label="Cerrar">×</button>
+        </div>
+        <div class="p-6 flex-1 overflow-auto">
+          <template x-if="historico.cargando"><div class="text-center py-12" style="color: var(--fg-faint)">Cargando datos…</div></template>
+          <template x-if="!historico.cargando && historico.sinDatos">
+            <div class="text-center py-12" style="color: var(--fg-faint)">Aún no hay suficiente historial.<br><span class="text-xs">Vuelve en unos días: cada noche se guarda un punto nuevo.</span></div>
+          </template>
+          <template x-if="!historico.cargando && !historico.sinDatos">
+            <div>
+              <div class="grid grid-cols-4 gap-px surface rounded-xl overflow-hidden mb-5 text-center">
+                <div class="p-3"><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Mínimo</div><div class="font-mono font-bold tnum" style="color: var(--accent)" x-text="historico.resumen.min ? formatear(historico.resumen.min) : '—'"></div></div>
+                <div class="p-3" style="border-left:1px solid var(--hairline)"><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Promedio</div><div class="font-mono font-bold tnum" x-text="historico.resumen.promedio ? formatear(historico.resumen.promedio) : '—'"></div></div>
+                <div class="p-3" style="border-left:1px solid var(--hairline)"><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Máximo</div><div class="font-mono font-bold tnum" style="color: var(--warn)" x-text="historico.resumen.max ? formatear(historico.resumen.max) : '—'"></div></div>
+                <div class="p-3" style="border-left:1px solid var(--hairline)"><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Tendencia</div><div class="font-bold text-sm" :style="historico.resumen.tendencia==='baja' ? 'color: var(--accent)' : historico.resumen.tendencia==='sube' ? 'color: var(--warn)' : ''" x-text="tendenciaLabel(historico.resumen)"></div></div>
+              </div>
+              <canvas id="grafico-historico" style="max-height: 360px;"></canvas>
+              <p class="text-xs mt-4 text-center" style="color: var(--fg-faint)">Últimos 90 días</p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ MODAL ALERTA ============ -->
+    <div x-show="alerta.abierto" x-transition.opacity @keydown.escape.window="cerrarAlerta()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,.5); backdrop-filter: blur(4px); display:none" role="dialog" aria-modal="true" aria-label="Crear alerta de precio">
+      <div @click.outside="cerrarAlerta()" class="surface rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <h3 class="font-display text-lg font-bold mb-1">Avísame si baja</h3>
+        <p class="text-sm mb-5" style="color: var(--fg-soft)" x-text="alerta.nombre"></p>
+        <template x-if="!alerta.ok">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--fg-faint)">Tu correo</label>
+              <input type="email" x-model="alerta.email" placeholder="tu@correo.cl" class="w-full px-3 py-2 surface rounded-lg outline-none" style="color: var(--fg)">
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--fg-faint)">Avísame cuando baje de</label>
+              <input type="number" x-model.number="alerta.objetivo" min="0" step="100" class="w-full px-3 py-2 surface rounded-lg outline-none font-mono" style="color: var(--fg)">
+            </div>
+            <template x-if="alerta.error"><div class="text-sm" style="color: var(--warn)" x-text="alerta.error"></div></template>
+            <button @click="enviarAlerta()" :disabled="alerta.enviando" class="w-full px-5 py-3 text-white font-semibold rounded-xl disabled:opacity-50" style="background: var(--accent)" x-text="alerta.enviando ? 'Creando…' : 'Crear alerta'"></button>
+            <p class="text-[11px] text-center" style="color: var(--fg-faint)">Te escribimos una sola vez cuando se cumpla. Puedes cancelarla desde el correo.</p>
+          </div>
+        </template>
+        <template x-if="alerta.ok">
+          <div class="text-center py-6">
+            <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style="background: var(--accent-tint); color: var(--accent)">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg>
+            </div>
+            <p class="font-medium">Listo. Te avisaremos.</p>
+            <button @click="cerrarAlerta()" class="mt-4 text-sm underline" style="color: var(--fg-soft)">Cerrar</button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="py-10" style="border-top:1px solid var(--hairline)">
+      <div class="max-w-5xl mx-auto px-4 text-sm" style="color: var(--fg-faint)">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-2">
+            <img src="/favicon.svg" alt="" width="20" height="20" />
+            <span>Comparador de Farmacias Chile</span>
+          </div>
+          <div class="flex gap-4">
+            <a href="/acerca" class="hover:underline">Acerca</a>
+            <a href="https://github.com/Faraysito/farmacias-cl" target="_blank" rel="noopener" class="hover:underline">Código</a>
+          </div>
+        </div>
+        <p class="mt-4 text-xs leading-relaxed max-w-2xl">Precios referenciales obtenidos de los sitios públicos de cada cadena; pueden no estar actualizados o diferir en tienda. Este sitio no vende medicamentos ni entrega consejo médico. Consulta siempre a un profesional de la salud.</p>
+      </div>
+    </footer>
+  </div>
+
+  <script is:inline>
+    const CADENAS_META = {
+      cruzverde: { label: "Cruz Verde", chip: "bg-[#e7f4ee] text-[#0e7c5a]" },
+      salcobrand: { label: "Salcobrand", chip: "bg-[#fbeee3] text-[#b9603a]" },
+      ahumada: { label: "Ahumada", chip: "bg-[#fdecec] text-[#c0392b]" },
+    };
+    const CATEGORIA_ICONOS = {
+      presion: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+      colesterol: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+      diabetes: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s6 7 6 12a6 6 0 0 1-12 0c0-5 6-12 6-12z"/></svg>',
+      dolor: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 15s1.5-2 4-2 4 2 4 2"/><path d="M9 9h.01M15 9h.01"/></svg>',
+      antiinflamatorio: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c2 4 6 6 6 11a6 6 0 0 1-12 0c0-2 1-3 2-4"/></svg>',
+      antibiotico: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(45 12 12)"/><path d="M9 9l6 6"/></svg>',
+      gastrico: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4c4 0 4 3 8 3 0 6-2 13-7 13S5 12 5 9c0-3 1-5 3-5z"/></svg>',
+      mental: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3a4 4 0 0 0-4 4v1a3 3 0 0 0 0 6 4 4 0 0 0 4 4V3z"/><path d="M15 3a4 4 0 0 1 4 4v1a3 3 0 0 1 0 6 4 4 0 0 1-4 4V3z"/></svg>',
+    };
+    const ICONO_FALLBACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(45 12 12)"/></svg>';
+
+    function app() {
+      return {
+        query: "", ultimaQuery: "",
+        grupos: [], total: 0,
+        loading: false, lentoOnDemand: false, error: "", yaBusque: false,
+        categorias: [], top: [], stats: null,
+        sugerencias: [], sugAbierto: false, sugIndex: -1,
+        esOscuro: false, copiado: false,
+        filtros: { soloBio: false, cadenas: ["cruzverde","salcobrand","ahumada"], precioMax: null, orden: "precio" },
+        historico: { abierto: false, cargando: false, sinDatos: false, nombre: "", resumen: {}, chart: null },
+        alerta: { abierto: false, medId: null, nombre: "", email: "", objetivo: null, enviando: false, ok: false, error: "" },
+
+        init() {
+          this.esOscuro = document.documentElement.classList.contains("dark");
+          this.cargarHome();
+          const q = new URLSearchParams(location.search).get("q");
+          if (q) { this.query = q; this.buscar(false); }
+          else { try { if (!localStorage.getItem("aviso_visto")) this.aviso = true; } catch(e) { this.aviso = true; } }
+          window.addEventListener("popstate", () => {
+            const nq = new URLSearchParams(location.search).get("q");
+            if (nq) { this.query = nq; this.buscar(false); }
+            else { this.yaBusque = false; this.grupos = []; }
+          });
+        },
+        aviso: false,
+        cerrarAviso() { this.aviso = false; try { localStorage.setItem("aviso_visto","1"); } catch(e){} },
+
+        toggleTema() {
+          this.esOscuro = !this.esOscuro;
+          document.documentElement.classList.toggle("dark", this.esOscuro);
+          try { localStorage.setItem("tema", this.esOscuro ? "oscuro" : "claro"); } catch(e){}
+          if (this.historico.abierto && this.historico.chart) this.historico.chart.update();
+        },
+
+        async cargarHome() {
+          try {
+            const [c, t, s] = await Promise.all([
+              fetch(`${window.API_URL}/api/home/categorias`),
+              fetch(`${window.API_URL}/api/home/top`),
+              fetch(`${window.API_URL}/api/home/stats`),
+            ]);
+            if (c.ok) this.categorias = await c.json();
+            if (t.ok) this.top = await t.json();
+            if (s.ok) this.stats = await s.json();
+          } catch (e) { console.warn("home falló", e); }
+        },
+
+        async pedirSugerencias() {
+          const q = this.query.trim();
+          if (q.length < 2) { this.sugerencias = []; this.sugAbierto = false; return; }
+          try {
+            const r = await fetch(`${window.API_URL}/api/autocomplete?q=${encodeURIComponent(q)}`);
+            if (!r.ok) return;
+            this.sugerencias = await r.json();
+            this.sugAbierto = this.sugerencias.length > 0;
             this.sugIndex = -1;
-          },
+          } catch (e) {}
+        },
+        navSug(d) {
+          if (!this.sugAbierto) return;
+          const m = this.sugerencias.length;
+          this.sugIndex = (this.sugIndex + d + m) % m;
+          const s = this.sugerencias[this.sugIndex];
+          if (s) this.query = s.valor;
+        },
+        cerrarSug() { this.sugAbierto = false; this.sugIndex = -1; },
 
-          async buscar() {
-            if (this.query.trim().length < 2) {
-              this.error = "Escribe al menos 2 caracteres";
-              return;
+        async buscar(push = true) {
+          const q = this.query.trim();
+          if (q.length < 2) { this.error = "Escribe al menos 2 caracteres"; return; }
+          this.loading = true; this.error = ""; this.ultimaQuery = q;
+          if (push) history.pushState({ q }, "", `?q=${encodeURIComponent(q)}`);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          const slow = setTimeout(() => { if (this.loading) this.lentoOnDemand = true; }, 1500);
+          try {
+            const r = await fetch(`${window.API_URL}/api/buscar?q=${encodeURIComponent(q)}`);
+            if (!r.ok) throw new Error("server");
+            const data = await r.json();
+            this.grupos = data.grupos || [];
+            this.total = data.total || this.grupos.length;
+            this.yaBusque = true;
+          } catch (e) {
+            this.error = "No pudimos conectar con el servidor. Si es la primera búsqueda, espera unos segundos y reintenta.";
+            this.grupos = [];
+          } finally {
+            clearTimeout(slow); this.loading = false; this.lentoOnDemand = false;
+          }
+        },
+
+        toggleCadena(c) {
+          const i = this.filtros.cadenas.indexOf(c);
+          if (i === -1) this.filtros.cadenas.push(c); else this.filtros.cadenas.splice(i, 1);
+        },
+
+        filasDe(g) {
+          const filas = [];
+          for (const med of g.medicamentos) {
+            if (this.filtros.soloBio && !med.es_bioequivalente) continue;
+            for (const p of med.precios) {
+              if (!this.filtros.cadenas.includes(p.cadena)) continue;
+              if (this.filtros.precioMax && p.precio > this.filtros.precioMax) continue;
+              filas.push({ med_id: med.id, nombre: med.nombre_comercial, laboratorio: med.laboratorio, es_bio: med.es_bioequivalente, cadena: p.cadena, precio: p.precio, url: p.url });
             }
-            this.loading = true;
-            this.error = "";
-            this.ultimaQuery = this.query;
-            window.scrollTo({ top: 0, behavior: "smooth" });
+          }
+          filas.sort((a, b) => a.precio - b.precio);
+          const max = filas.length ? filas[filas.length - 1].precio : 1;
+          filas.forEach((f, i) => {
+            f.pct = Math.max(8, Math.round((f.precio / max) * 100));
+            f.color = i === 0 ? "var(--accent-bright)" : (i === filas.length - 1 && filas.length > 1 ? "var(--warn)" : "var(--fg-faint)");
+          });
+          return filas;
+        },
 
-            const slowTimeout = setTimeout(() => {
-              if (this.loading) this.lentoOnDemand = true;
-            }, 1500);
+        gruposOrdenados() {
+          const visibles = this.grupos.filter(g => this.filasDe(g).length > 0);
+          if (this.filtros.orden === "ahorro") {
+            return [...visibles].sort((a, b) => (b.ahorro_abs || 0) - (a.ahorro_abs || 0));
+          }
+          return visibles;
+        },
 
-            try {
-              const r = await fetch(
-                `${window.API_URL}/api/buscar?q=${encodeURIComponent(this.query)}`
-              );
-              if (!r.ok) throw new Error("server error");
-              this.grupos = await r.json();
-              this.yaBusque = true;
-            } catch (e) {
-              this.error = "No se pudo conectar con el servidor. ¿Está corriendo el backend?";
-              this.grupos = [];
-            } finally {
-              clearTimeout(slowTimeout);
-              this.loading = false;
-              this.lentoOnDemand = false;
-            }
-          },
+        compartir() {
+          const url = `${location.origin}/?q=${encodeURIComponent(this.ultimaQuery)}`;
+          navigator.clipboard?.writeText(url).then(() => {
+            this.copiado = true; setTimeout(() => this.copiado = false, 2000);
+          });
+        },
 
-          toggleCadena(c) {
-            const i = this.filtros.cadenas.indexOf(c);
-            if (i === -1) this.filtros.cadenas.push(c);
-            else this.filtros.cadenas.splice(i, 1);
-          },
-
-          limpiarFiltros() {
-            this.filtros.soloBio = false;
-            this.filtros.cadenas = ["cruzverde", "salcobrand", "ahumada"];
-            this.filtros.precioMax = null;
-          },
-
-          gruposFiltrados() {
-            const out = [];
-            for (const g of this.grupos) {
-              const filas = this.filasDe(g);
-              if (filas.length === 0) continue;
-              out.push(g);
-            }
-            return out;
-          },
-
-          filasDe(grupo) {
-            const filas = [];
-            for (const med of grupo.medicamentos) {
-              if (this.filtros.soloBio && !med.es_bioequivalente) continue;
-              for (const p of med.precios) {
-                if (!this.filtros.cadenas.includes(p.cadena)) continue;
-                if (this.filtros.precioMax && p.precio > this.filtros.precioMax) continue;
-                filas.push({
-                  med_id: med.id,
-                  nombre: med.nombre_comercial,
-                  laboratorio: med.laboratorio,
-                  es_bio: med.es_bioequivalente,
-                  cadena: p.cadena,
-                  precio: p.precio,
-                  url: p.url,
-                });
-              }
-            }
-            filas.sort((a, b) => a.precio - b.precio);
-            return filas;
-          },
-
-          async abrirHistorico(medId, nombre) {
-            this.historico.abierto = true;
-            this.historico.cargando = true;
-            this.historico.sinDatos = false;
-            this.historico.nombre = nombre;
-
-            try {
-              const r = await fetch(`${window.API_URL}/api/historico/${medId}?dias=90`);
-              if (!r.ok) throw new Error();
-              const data = await r.json();
-
-              const cadenas = Object.keys(data.series);
-              const total = cadenas.reduce((a, c) => a + data.series[c].length, 0);
-
-              this.historico.cargando = false;
-
-              if (total < 2) {
-                this.historico.sinDatos = true;
-                return;
-              }
-
-              this.$nextTick(() => this.dibujarGrafico(data));
-            } catch (e) {
-              this.historico.cargando = false;
-              this.historico.sinDatos = true;
-            }
-          },
-
-          cerrarHistorico() {
-            this.historico.abierto = false;
-            if (this.historico.chart) {
-              this.historico.chart.destroy();
-              this.historico.chart = null;
-            }
-          },
-
-          dibujarGrafico(data) {
-            const canvas = document.getElementById("grafico-historico");
-            if (!canvas) return;
-
-            const colores = {
-              cruzverde: "#16a34a",
-              salcobrand: "#ea580c",
-              ahumada: "#dc2626",
-            };
-
-            const datasets = Object.entries(data.series).map(([cadena, puntos]) => ({
-              label: CADENAS_META[cadena]?.label || cadena,
-              data: puntos.map(p => ({ x: p.fecha, y: p.precio })),
-              borderColor: colores[cadena] || "#666",
-              backgroundColor: colores[cadena] || "#666",
-              tension: 0.2,
-              pointRadius: 3,
-            }));
-
-            if (this.historico.chart) this.historico.chart.destroy();
-
-            this.historico.chart = new Chart(canvas, {
-              type: "line",
-              data: { datasets },
-              options: {
-                responsive: true,
-                interaction: { mode: "nearest", intersect: false },
-                scales: {
-                  x: {
-                    type: "time",
-                    time: { unit: "day", tooltipFormat: "dd MMM yyyy" },
-                  },
-                  y: {
-                    beginAtZero: false,
-                    ticks: { callback: v => "$" + v.toLocaleString("es-CL") },
-                  },
-                },
-                plugins: {
-                  tooltip: {
-                    callbacks: {
-                      label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y.toLocaleString("es-CL")}`,
-                    },
-                  },
-                },
+        async abrirHistorico(medId, nombre) {
+          this.historico.abierto = true; this.historico.cargando = true;
+          this.historico.sinDatos = false; this.historico.nombre = nombre; this.historico.resumen = {};
+          try {
+            const r = await fetch(`${window.API_URL}/api/historico/${medId}?dias=90`);
+            if (!r.ok) throw new Error();
+            const data = await r.json();
+            this.historico.resumen = data.resumen || {};
+            const total = Object.values(data.series).reduce((a, c) => a + c.length, 0);
+            this.historico.cargando = false;
+            if (total < 2) { this.historico.sinDatos = true; return; }
+            this.$nextTick(() => this.dibujarGrafico(data));
+          } catch (e) { this.historico.cargando = false; this.historico.sinDatos = true; }
+        },
+        cerrarHistorico() {
+          this.historico.abierto = false;
+          if (this.historico.chart) { this.historico.chart.destroy(); this.historico.chart = null; }
+        },
+        tendenciaLabel(r) {
+          if (!r || !r.tendencia) return "—";
+          if (r.tendencia === "baja") return `↓ ${Math.abs(r.variacion_pct)}%`;
+          if (r.tendencia === "sube") return `↑ ${r.variacion_pct}%`;
+          return "estable";
+        },
+        dibujarGrafico(data) {
+          const canvas = document.getElementById("grafico-historico");
+          if (!canvas || typeof Chart === "undefined") return;
+          const colores = { cruzverde: "#0e7c5a", salcobrand: "#b9603a", ahumada: "#c0392b" };
+          const tick = getComputedStyle(document.documentElement).getPropertyValue("--fg-faint").trim() || "#888";
+          const datasets = Object.entries(data.series).map(([cadena, puntos]) => ({
+            label: CADENAS_META[cadena]?.label || cadena,
+            data: puntos.map(p => ({ x: p.fecha, y: p.precio })),
+            borderColor: colores[cadena] || "#666", backgroundColor: colores[cadena] || "#666",
+            tension: 0.25, pointRadius: 3,
+          }));
+          if (this.historico.chart) this.historico.chart.destroy();
+          this.historico.chart = new Chart(canvas, {
+            type: "line", data: { datasets },
+            options: {
+              responsive: true, interaction: { mode: "nearest", intersect: false },
+              scales: {
+                x: { type: "time", time: { unit: "day", tooltipFormat: "dd MMM yyyy" }, ticks: { color: tick }, grid: { display: false } },
+                y: { beginAtZero: false, ticks: { color: tick, callback: v => "$" + v.toLocaleString("es-CL") }, grid: { color: "rgba(128,128,128,.15)" } },
               },
-            });
-          },
+              plugins: {
+                legend: { labels: { color: tick } },
+                tooltip: { callbacks: { label: c => `${c.dataset.label}: $${c.parsed.y.toLocaleString("es-CL")}` } },
+              },
+            },
+          });
+        },
 
-          labelDeCadena(c) { return CADENAS_META[c]?.label || c; },
-          claseDeCadena(c) { return CADENAS_META[c]?.clase || "bg-slate-100 text-slate-700"; },
-          formatearPrecio(p) { return "$" + p.toLocaleString("es-CL"); },
-        };
-      }
-    </script>
-  </body>
-</html>
+        abrirAlerta(medId, nombre, precio) {
+          this.alerta = { abierto: true, medId, nombre, email: "", objetivo: Math.round(precio * 0.9), enviando: false, ok: false, error: "" };
+        },
+        cerrarAlerta() { this.alerta.abierto = false; },
+        async enviarAlerta() {
+          if (!this.alerta.email || !this.alerta.email.includes("@")) { this.alerta.error = "Escribe un correo válido."; return; }
+          if (!this.alerta.objetivo || this.alerta.objetivo <= 0) { this.alerta.error = "Escribe un precio objetivo."; return; }
+          this.alerta.enviando = true; this.alerta.error = "";
+          try {
+            const r = await fetch(`${window.API_URL}/api/alertas`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: this.alerta.email, medicamento_id: this.alerta.medId, precio_objetivo: this.alerta.objetivo }),
+            });
+            if (!r.ok) throw new Error();
+            this.alerta.ok = true;
+          } catch (e) { this.alerta.error = "No se pudo crear la alerta. Reintenta."; }
+          finally { this.alerta.enviando = false; }
+        },
+
+        labelCadena(c) { return CADENAS_META[c]?.label || c; },
+        chipCadena(c) { return CADENAS_META[c]?.chip || "bg-[var(--hairline)]"; },
+        iconoCategoria(id) { return CATEGORIA_ICONOS[id] || ICONO_FALLBACK; },
+        formatear(p) { return "$" + Math.round(p).toLocaleString("es-CL"); },
+        relativo(iso) {
+          if (!iso) return "";
+          const d = new Date(iso); const h = Math.floor((Date.now() - d) / 36e5);
+          if (h < 1) return "hace minutos";
+          if (h < 24) return `hace ${h} h`;
+          const dias = Math.floor(h / 24);
+          return dias === 1 ? "ayer" : `hace ${dias} días`;
+        },
+      };
+    }
+  </script>
+</Base>

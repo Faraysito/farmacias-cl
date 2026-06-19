@@ -1,18 +1,21 @@
-from typing import List
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import timedelta
+from typing import List
+
 from sqlalchemy.orm import Session
+
 from app.database import SessionLocal
-from app.models import PrincipioActivo, Medicamento, Farmacia, Precio
-from app.scrapers.base import ProductoRaw
+from app.models import Farmacia, Medicamento, Precio, PrincipioActivo, utcnow
 from app.normalizador import normalizar
+from app.scrapers.base import ProductoRaw
 
 
 def _normalizar_lab(lab: str | None) -> str:
     if not lab:
         return ""
     s = "".join(
-        c for c in unicodedata.normalize("NFD", lab.lower())
+        c
+        for c in unicodedata.normalize("NFD", lab.lower())
         if unicodedata.category(c) != "Mn"
     )
     for sufijo in [" s.a", " sa", " spa", " ltda", " limitada", " chile"]:
@@ -21,10 +24,11 @@ def _normalizar_lab(lab: str | None) -> str:
 
 
 def get_or_create_farmacia_cadena(db: Session, cadena: str) -> Farmacia:
-    f = db.query(Farmacia).filter(
-        Farmacia.cadena == cadena,
-        Farmacia.nombre == f"{cadena} online"
-    ).first()
+    f = (
+        db.query(Farmacia)
+        .filter(Farmacia.cadena == cadena, Farmacia.nombre == f"{cadena} online")
+        .first()
+    )
     if f:
         return f
     f = Farmacia(cadena=cadena, nombre=f"{cadena} online", comuna="online")
@@ -33,11 +37,14 @@ def get_or_create_farmacia_cadena(db: Session, cadena: str) -> Farmacia:
     return f
 
 
-def get_or_create_principio(db: Session, nombre: str, dosis: str | None) -> PrincipioActivo:
-    p = db.query(PrincipioActivo).filter(
-        PrincipioActivo.nombre == nombre,
-        PrincipioActivo.dosis == dosis
-    ).first()
+def get_or_create_principio(
+    db: Session, nombre: str, dosis: str | None
+) -> PrincipioActivo:
+    p = (
+        db.query(PrincipioActivo)
+        .filter(PrincipioActivo.nombre == nombre, PrincipioActivo.dosis == dosis)
+        .first()
+    )
     if p:
         return p
     p = PrincipioActivo(nombre=nombre, dosis=dosis)
@@ -54,9 +61,11 @@ def get_or_create_medicamento(
     principio_id: int,
 ) -> Medicamento:
     lab_norm = _normalizar_lab(laboratorio)
-    candidatos = db.query(Medicamento).filter(
-        Medicamento.principio_activo_id == principio_id,
-    ).all()
+    candidatos = (
+        db.query(Medicamento)
+        .filter(Medicamento.principio_activo_id == principio_id)
+        .all()
+    )
     for c in candidatos:
         if _normalizar_lab(c.laboratorio) == lab_norm:
             return c
@@ -76,7 +85,8 @@ def guardar_productos(productos: List[ProductoRaw]) -> int:
     db = SessionLocal()
     insertados = 0
     try:
-        hoy_inicio = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        ahora = utcnow()
+        hoy_inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
         manana = hoy_inicio + timedelta(days=1)
 
         for p in productos:
@@ -92,7 +102,7 @@ def guardar_productos(productos: List[ProductoRaw]) -> int:
             )
             farmacia = get_or_create_farmacia_cadena(db, p.cadena)
 
-            # si ya hay un precio hoy para este med+farmacia, lo actualizo
+            # Un único punto por día y farmacia: si ya existe hoy, se actualiza.
             existente = (
                 db.query(Precio)
                 .filter(
@@ -108,15 +118,18 @@ def guardar_productos(productos: List[ProductoRaw]) -> int:
                 existente.precio = p.precio_actual
                 existente.stock = p.stock
                 existente.url = p.url or None
-                existente.fecha_scrape = datetime.utcnow()
+                existente.fecha_scrape = ahora
             else:
-                db.add(Precio(
-                    medicamento_id=medicamento.id,
-                    farmacia_id=farmacia.id,
-                    precio=p.precio_actual,
-                    stock=p.stock,
-                    url=p.url or None,
-                ))
+                db.add(
+                    Precio(
+                        medicamento_id=medicamento.id,
+                        farmacia_id=farmacia.id,
+                        precio=p.precio_actual,
+                        stock=p.stock,
+                        url=p.url or None,
+                        fecha_scrape=ahora,
+                    )
+                )
                 insertados += 1
 
         db.commit()

@@ -1,0 +1,101 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  withChart?: boolean;
+}
+
+const {
+  title = "Remedios al mejor precio · Comparador de farmacias Chile",
+  description = "Compara el precio del mismo medicamento en Cruz Verde, Salcobrand y Ahumada. Agrupado por principio activo, con bioequivalentes más baratos. Sin registro, sin publicidad.",
+  withChart = false,
+} = Astro.props;
+
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:8000";
+const SITE = "https://farmacias-cl.vercel.app";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={SITE} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_CL" />
+    <meta property="og:site_name" content="Comparador de Farmacias Chile" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={SITE} />
+    <meta property="og:image" content={`${SITE}/og.svg`} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`${SITE}/og.svg`} />
+
+    <!-- Fuentes: display + body + mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- No-flash de tema: corre antes del primer paint -->
+    <script is:inline>
+      (function () {
+        try {
+          const t = localStorage.getItem("tema");
+          const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (t === "oscuro" || (!t && sysDark)) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <script is:inline set:html={`window.API_URL = "${API_URL}";`}></script>
+
+    {
+      withChart && (
+        <>
+          <script
+            is:inline
+            src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+          />
+          <script
+            is:inline
+            src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"
+          />
+        </>
+      )
+    }
+
+    <script
+      type="application/ld+json"
+      is:inline
+      set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: "Comparador de Farmacias Chile",
+        applicationCategory: "HealthApplication",
+        operatingSystem: "Web",
+        url: SITE,
+        description,
+        offers: { "@type": "Offer", price: "0", priceCurrency: "CLP" },
+      })}
+    />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

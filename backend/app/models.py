@@ -1,8 +1,23 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geography
-from datetime import datetime
+
 from app.database import Base
+
+
+def utcnow() -> datetime:
+    """Timestamp timezone-aware (reemplaza datetime.utcnow, deprecado en 3.12)."""
+    return datetime.now(timezone.utc)
 
 
 class PrincipioActivo(Base):
@@ -46,7 +61,22 @@ class Precio(Base):
     precio = Column(Float, nullable=False)
     stock = Column(Boolean, default=True)
     url = Column(String)  # link directo al producto
-    fecha_scrape = Column(DateTime, default=datetime.utcnow, index=True)
+    fecha_scrape = Column(DateTime, default=utcnow, index=True)
 
     medicamento = relationship("Medicamento", back_populates="precios")
     farmacia = relationship("Farmacia", back_populates="precios")
+
+
+class AlertaPrecio(Base):
+    """Suscripción de un usuario a la baja de precio de un medicamento."""
+
+    __tablename__ = "alertas_precio"
+    id = Column(Integer, primary_key=True)
+    email = Column(String, nullable=False, index=True)
+    medicamento_id = Column(Integer, ForeignKey("medicamentos.id"), index=True)
+    precio_objetivo = Column(Float, nullable=False)
+    activa = Column(Boolean, default=True, index=True)
+    creada = Column(DateTime, default=utcnow)
+    ultima_notificacion = Column(DateTime, nullable=True)
+
+    medicamento = relationship("Medicamento")

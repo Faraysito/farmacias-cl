@@ -1,1 +1,128 @@
 @import "tailwindcss";
+
+/* Modo oscuro por clase .dark en <html> (toggle manual + no-flash). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- Design tokens ----
+   Sistema semántico: el color codifica significado.
+   jade  = precio bajo / ahorro (lo que quieres)
+   clay  = precio alto         (lo que evitas)
+*/
+@theme {
+  --color-paper: #f6f7f5;
+  --color-surface: #ffffff;
+  --color-ink: #13231b;
+  --color-ink-soft: #4a5a52;
+  --color-ink-faint: #8a9690;
+  --color-line: #e3e7e3;
+
+  --color-jade: #0e7c5a;
+  --color-jade-bright: #2fb67e;
+  --color-jade-tint: #e7f4ee;
+  --color-clay: #b9603a;
+  --color-clay-tint: #f6ebe4;
+  --color-amber: #b6852a;
+
+  --font-display: "Bricolage Grotesque", "Plus Jakarta Sans", sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Tokens que cambian en dark mode (se consumen con var() en utilidades base). */
+:root {
+  --bg: var(--color-paper);
+  --bg-surface: var(--color-surface);
+  --fg: var(--color-ink);
+  --fg-soft: var(--color-ink-soft);
+  --fg-faint: var(--color-ink-faint);
+  --hairline: var(--color-line);
+  --accent: var(--color-jade);
+  --accent-bright: var(--color-jade-bright);
+  --accent-tint: var(--color-jade-tint);
+  --warn: var(--color-clay);
+  --warn-tint: var(--color-clay-tint);
+}
+.dark {
+  --bg: #0c1410;
+  --bg-surface: #14201a;
+  --fg: #e8efea;
+  --fg-soft: #a9b8b0;
+  --fg-faint: #6f7f77;
+  --hairline: #243029;
+  --accent: #2fb67e;
+  --accent-bright: #57d39b;
+  --accent-tint: #15281f;
+  --warn: #d07c52;
+  --warn-tint: #2a1d15;
+}
+
+html {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+body {
+  background:
+    radial-gradient(var(--hairline) 1px, transparent 1px) 0 0 / 26px 26px;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+.dark body { opacity: 1; }
+
+::selection { background: var(--accent); color: #fff; }
+
+h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.02em; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Foco visible y accesible en todo control interactivo. */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Surface helper para no repetir bg + borde en cada tarjeta. */
+.surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--hairline);
+}
+
+/* ---- Skeleton shimmer ---- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--hairline);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--bg-surface) 70%, transparent),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* ---- Reveal de tarjetas ---- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

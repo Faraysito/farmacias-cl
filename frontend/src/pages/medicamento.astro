@@ -1,0 +1,149 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base withChart={true} title="Detalle del medicamento · Farmacias Chile">
+  <div x-data="detalle()" x-init="init()" class="min-h-screen">
+    <header class="sticky top-0 z-40 backdrop-blur" style="background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom:1px solid var(--hairline)">
+      <div class="max-w-3xl mx-auto px-4 h-16 flex items-center gap-3">
+        <a href="/" class="flex items-center gap-2" aria-label="Inicio">
+          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <span class="font-display font-extrabold text-lg tracking-tight">Remedios<span style="color: var(--accent)">.cl</span></span>
+        </a>
+        <a href="/" class="ml-auto text-sm hover:underline" style="color: var(--fg-soft)">← Volver a buscar</a>
+      </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-4 py-10">
+      <template x-if="cargando"><div class="space-y-4"><div class="skeleton h-8 w-64"></div><div class="skeleton h-40 w-full"></div></div></template>
+      <template x-if="!cargando && error">
+        <div class="text-center py-16">
+          <p class="font-display text-xl font-bold mb-2">No encontramos ese medicamento</p>
+          <a href="/" class="underline" style="color: var(--accent)">Volver a buscar</a>
+        </div>
+      </template>
+
+      <template x-if="!cargando && med">
+        <div>
+          <div class="mb-2"><span class="text-xs font-semibold px-2 py-0.5 rounded uppercase tracking-wide" style="background: var(--accent-tint); color: var(--accent)" x-text="med.principio_activo || 's/i'"></span></div>
+          <h1 class="font-display text-3xl font-extrabold mb-1" x-text="med.nombre_comercial"></h1>
+          <p style="color: var(--fg-soft)"><span x-text="med.laboratorio || 'laboratorio s/i'"></span> · <span x-text="med.dosis || 'dosis variable'"></span><template x-if="med.es_bioequivalente"><span class="ml-2 px-2 py-0.5 rounded text-[10px] font-medium" style="background: var(--accent-tint); color: var(--accent)">BIOEQUIVALENTE</span></template></p>
+
+          <!-- precio actual por cadena -->
+          <h2 class="font-display font-bold mt-8 mb-3">Precio actual por cadena</h2>
+          <div class="surface rounded-2xl overflow-hidden">
+            <template x-if="actuales.length === 0"><div class="p-5 text-sm" style="color: var(--fg-faint)">Sin precios recientes.</div></template>
+            <template x-for="(f, i) in actuales" :key="f.cadena">
+              <div class="px-5 py-3 flex items-center justify-between" :style="i ? 'border-top:1px solid var(--hairline)' : 'background: var(--accent-tint)'">
+                <span class="px-2 py-1 rounded-md text-xs font-semibold uppercase tracking-wide" :class="chipCadena(f.cadena)" x-text="labelCadena(f.cadena)"></span>
+                <div class="flex items-center gap-3">
+                  <template x-if="i===0 && actuales.length>1"><span class="px-2 py-0.5 text-white rounded text-[10px] font-bold" style="background: var(--accent)">MÁS BARATO</span></template>
+                  <div class="font-mono text-xl font-bold tnum" :style="i===0 ? 'color: var(--accent)' : 'color: var(--fg)'" x-text="formatear(f.precio)"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="flex gap-3 mt-4">
+            <button @click="abrirAlerta()" class="flex items-center gap-2 px-4 py-2.5 surface rounded-xl text-sm font-medium transition-colors hover:border-[var(--accent)]" style="color: var(--fg)">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              Avisarme si baja
+            </button>
+            <button @click="compartir()" class="flex items-center gap-2 px-4 py-2.5 surface rounded-xl text-sm font-medium transition-colors hover:border-[var(--accent)]" style="color: var(--fg)">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v14"/></svg>
+              <span x-text="copiado ? '¡Copiado!' : 'Compartir'"></span>
+            </button>
+          </div>
+
+          <!-- histórico -->
+          <h2 class="font-display font-bold mt-10 mb-3">Histórico (90 días)</h2>
+          <template x-if="sinHistorial"><div class="surface rounded-2xl p-6 text-center text-sm" style="color: var(--fg-faint)">Aún no hay suficiente historial. Vuelve en unos días.</div></template>
+          <template x-if="!sinHistorial">
+            <div class="surface rounded-2xl p-5">
+              <div class="grid grid-cols-3 gap-px mb-5 text-center">
+                <div><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Mínimo</div><div class="font-mono font-bold tnum" style="color: var(--accent)" x-text="resumen.min ? formatear(resumen.min) : '—'"></div></div>
+                <div><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Promedio</div><div class="font-mono font-bold tnum" x-text="resumen.promedio ? formatear(resumen.promedio) : '—'"></div></div>
+                <div><div class="text-[10px] uppercase" style="color: var(--fg-faint)">Máximo</div><div class="font-mono font-bold tnum" style="color: var(--warn)" x-text="resumen.max ? formatear(resumen.max) : '—'"></div></div>
+              </div>
+              <canvas id="g-detalle" style="max-height:340px"></canvas>
+            </div>
+          </template>
+        </div>
+      </template>
+    </main>
+
+    <!-- modal alerta (reutilizado) -->
+    <div x-show="alerta.abierto" x-transition.opacity @keydown.escape.window="alerta.abierto=false" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,.5); backdrop-filter: blur(4px); display:none" role="dialog" aria-modal="true">
+      <div @click.outside="alerta.abierto=false" class="surface rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <h3 class="font-display text-lg font-bold mb-1">Avísame si baja</h3>
+        <p class="text-sm mb-5" style="color: var(--fg-soft)" x-text="med?.nombre_comercial"></p>
+        <template x-if="!alerta.ok">
+          <div class="space-y-4">
+            <div><label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--fg-faint)">Tu correo</label><input type="email" x-model="alerta.email" placeholder="tu@correo.cl" class="w-full px-3 py-2 surface rounded-lg outline-none" style="color: var(--fg)"></div>
+            <div><label class="block text-xs uppercase tracking-wide mb-1" style="color: var(--fg-faint)">Cuando baje de</label><input type="number" x-model.number="alerta.objetivo" min="0" step="100" class="w-full px-3 py-2 surface rounded-lg outline-none font-mono" style="color: var(--fg)"></div>
+            <template x-if="alerta.error"><div class="text-sm" style="color: var(--warn)" x-text="alerta.error"></div></template>
+            <button @click="enviarAlerta()" :disabled="alerta.enviando" class="w-full px-5 py-3 text-white font-semibold rounded-xl disabled:opacity-50" style="background: var(--accent)" x-text="alerta.enviando ? 'Creando…' : 'Crear alerta'"></button>
+          </div>
+        </template>
+        <template x-if="alerta.ok"><div class="text-center py-6"><p class="font-medium">Listo. Te avisaremos.</p><button @click="alerta.abierto=false" class="mt-4 text-sm underline" style="color: var(--fg-soft)">Cerrar</button></div></template>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    const META = { cruzverde:{label:"Cruz Verde",chip:"bg-[#e7f4ee] text-[#0e7c5a]"}, salcobrand:{label:"Salcobrand",chip:"bg-[#fbeee3] text-[#b9603a]"}, ahumada:{label:"Ahumada",chip:"bg-[#fdecec] text-[#c0392b]"} };
+    function detalle() {
+      return {
+        cargando: true, error: false, med: null, actuales: [], resumen: {}, sinHistorial: false, copiado: false,
+        alerta: { abierto:false, email:"", objetivo:null, enviando:false, ok:false, error:"" },
+        async init() {
+          const id = new URLSearchParams(location.search).get("id");
+          if (!id) { this.cargando=false; this.error=true; return; }
+          this.medId = id;
+          try {
+            const r = await fetch(`${window.API_URL}/api/historico/${id}?dias=90`);
+            if (!r.ok) throw new Error();
+            const data = await r.json();
+            this.med = data.medicamento; this.resumen = data.resumen || {};
+            // precio actual = último punto de cada serie
+            const filas = [];
+            for (const [cadena, pts] of Object.entries(data.series)) {
+              if (pts.length) filas.push({ cadena, precio: pts[pts.length-1].precio });
+            }
+            filas.sort((a,b)=>a.precio-b.precio);
+            this.actuales = filas;
+            const total = Object.values(data.series).reduce((a,c)=>a+c.length,0);
+            this.cargando = false;
+            if (total < 2) { this.sinHistorial = true; return; }
+            this.$nextTick(()=>this.grafico(data));
+          } catch(e) { this.cargando=false; this.error=true; }
+        },
+        grafico(data) {
+          const c = document.getElementById("g-detalle");
+          if (!c || typeof Chart === "undefined") return;
+          const col = { cruzverde:"#0e7c5a", salcobrand:"#b9603a", ahumada:"#c0392b" };
+          const tick = getComputedStyle(document.documentElement).getPropertyValue("--fg-faint").trim() || "#888";
+          new Chart(c, {
+            type:"line",
+            data:{ datasets: Object.entries(data.series).map(([k,p])=>({ label: META[k]?.label||k, data: p.map(x=>({x:x.fecha,y:x.precio})), borderColor: col[k]||"#666", backgroundColor: col[k]||"#666", tension:0.25, pointRadius:3 })) },
+            options:{ responsive:true, interaction:{mode:"nearest",intersect:false}, scales:{ x:{type:"time",time:{unit:"day",tooltipFormat:"dd MMM yyyy"},ticks:{color:tick},grid:{display:false}}, y:{ticks:{color:tick,callback:v=>"$"+v.toLocaleString("es-CL")},grid:{color:"rgba(128,128,128,.15)"}} }, plugins:{ legend:{labels:{color:tick}} } },
+          });
+        },
+        abrirAlerta() { const min = this.actuales[0]?.precio || 1000; this.alerta = { abierto:true, email:"", objetivo: Math.round(min*0.9), enviando:false, ok:false, error:"" }; },
+        async enviarAlerta() {
+          if (!this.alerta.email.includes("@")) { this.alerta.error="Correo inválido."; return; }
+          this.alerta.enviando = true; this.alerta.error="";
+          try {
+            const r = await fetch(`${window.API_URL}/api/alertas`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email:this.alerta.email, medicamento_id: Number(this.medId), precio_objetivo: this.alerta.objetivo }) });
+            if (!r.ok) throw new Error();
+            this.alerta.ok = true;
+          } catch(e) { this.alerta.error="No se pudo crear. Reintenta."; }
+          finally { this.alerta.enviando=false; }
+        },
+        compartir() { navigator.clipboard?.writeText(location.href).then(()=>{ this.copiado=true; setTimeout(()=>this.copiado=false,2000); }); },
+        labelCadena(c){return META[c]?.label||c;}, chipCadena(c){return META[c]?.chip||"";},
+        formatear(p){return "$"+Math.round(p).toLocaleString("es-CL");},
+      };
+    }
+  </script>
+</Base>

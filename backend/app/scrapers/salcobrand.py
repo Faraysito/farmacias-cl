@@ -1,11 +1,12 @@
 """Scraper Salcobrand vía API Algolia directa (sin browser)."""
-import httpx
 from typing import List
+
+import httpx
+
+from app.config import SALCOBRAND_ALGOLIA_API_KEY, SALCOBRAND_ALGOLIA_APP_ID
 from app.scrapers.base import ProductoRaw
 
-ALGOLIA_APP_ID = "GM3RP06HJG"
-ALGOLIA_API_KEY = "0259fe250b3be4b1326eb85e47aa7d81"
-ALGOLIA_HOST = f"https://{ALGOLIA_APP_ID.lower()}-dsn.algolia.net"
+ALGOLIA_HOST = f"https://{SALCOBRAND_ALGOLIA_APP_ID.lower()}-dsn.algolia.net"
 ALGOLIA_INDEX = "sb_variant_production"
 
 CADENA = "salcobrand"
@@ -16,8 +17,8 @@ async def buscar(query: str, limite: int = 24) -> List[ProductoRaw]:
     url = f"{ALGOLIA_HOST}/1/indexes/*/queries"
     params = {
         "x-algolia-agent": "Algolia for JavaScript (4.14.3); Browser (lite)",
-        "x-algolia-api-key": ALGOLIA_API_KEY,
-        "x-algolia-application-id": ALGOLIA_APP_ID,
+        "x-algolia-api-key": SALCOBRAND_ALGOLIA_API_KEY,
+        "x-algolia-application-id": SALCOBRAND_ALGOLIA_APP_ID,
     }
     algolia_params = (
         "clickAnalytics=true"
@@ -26,11 +27,7 @@ async def buscar(query: str, limite: int = 24) -> List[ProductoRaw]:
         f"&query={query}"
         "&tagFilters="
     )
-    body = {
-        "requests": [
-            {"indexName": ALGOLIA_INDEX, "params": algolia_params}
-        ]
-    }
+    body = {"requests": [{"indexName": ALGOLIA_INDEX, "params": algolia_params}]}
     headers = {
         "Origin": "https://salcobrand.cl",
         "Referer": "https://salcobrand.cl/",

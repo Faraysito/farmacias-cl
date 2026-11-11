@@ -26,7 +26,7 @@ class GrupoResponse(BaseModel):
     principio_activo: str
     dosis: str | None
     cantidad_medicamentos: int
-    # Resumen de ahorro: el gancho comercial de la app.
+    # resumen de ahorro del grupo
     precio_min: float | None = None
     precio_max: float | None = None
     ahorro_abs: float | None = None

@@ -1,13 +1,9 @@
 @import "tailwindcss";
 
-/* Modo oscuro por clase .dark en <html> (toggle manual + no-flash). */
+/* modo oscuro con la clase .dark en <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ---- Design tokens ----
-   Sistema semántico: el color codifica significado.
-   jade  = precio bajo / ahorro (lo que quieres)
-   clay  = precio alto         (lo que evitas)
-*/
+/* colores: jade = precio bajo / ahorro, clay = precio alto */
 @theme {
   --color-paper: #f6f7f5;
   --color-surface: #ffffff;
@@ -28,7 +24,7 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-/* Tokens que cambian en dark mode (se consumen con var() en utilidades base). */
+/* variables que cambian en dark mode */
 :root {
   --bg: var(--color-paper);
   --bg-surface: var(--color-surface);
@@ -76,20 +72,20 @@ body {
 h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.02em; }
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* Foco visible y accesible en todo control interactivo. */
+/* foco visible */
 :where(a, button, input, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 6px;
 }
 
-/* Surface helper para no repetir bg + borde en cada tarjeta. */
+/* fondo + borde de las tarjetas */
 .surface {
   background: var(--bg-surface);
   border: 1px solid var(--hairline);
 }
 
-/* ---- Skeleton shimmer ---- */
+/* skeleton */
 .skeleton {
   position: relative;
   overflow: hidden;
@@ -111,7 +107,7 @@ h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0
 }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 
-/* ---- Reveal de tarjetas ---- */
+/* entrada de las tarjetas */
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }

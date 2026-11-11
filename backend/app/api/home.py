@@ -6,7 +6,7 @@ from app.models import Medicamento, Precio, Farmacia, PrincipioActivo
 
 router = APIRouter()
 
-# Categorías hardcoded — query = búsqueda que dispara
+# categorías fijas del home; query es la búsqueda que lanza cada una
 CATEGORIAS = [
     {"id": "presion", "nombre": "Presión arterial", "icono": "🩺", "query": "losartan", "color": "from-red-500 to-pink-500"},
     {"id": "colesterol", "nombre": "Colesterol", "icono": "💊", "query": "atorvastatina", "color": "from-amber-500 to-orange-500"},

@@ -42,7 +42,7 @@ const SITE = "https://farmacias-cl.vercel.app";
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={`${SITE}/og.svg`} />
 
-    <!-- Fuentes: display + body + mono -->
+    <!-- fuentes -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -50,7 +50,7 @@ const SITE = "https://farmacias-cl.vercel.app";
       rel="stylesheet"
     />
 
-    <!-- No-flash de tema: corre antes del primer paint -->
+    <!-- aplica el tema antes de pintar para que no parpadee -->
     <script is:inline>
       (function () {
         try {

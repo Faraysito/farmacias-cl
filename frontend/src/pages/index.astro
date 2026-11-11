@@ -4,7 +4,7 @@ import Base from "../layouts/Base.astro";
 
 <Base withChart={true}>
   <div x-data="app()" x-init="init()" class="min-h-screen">
-    <!-- ============ HEADER ============ -->
+    <!-- header -->
     <header
       class="sticky top-0 z-40 backdrop-blur"
       style="background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--hairline);"
@@ -48,7 +48,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </header>
 
-    <!-- ============ NOTA DEV (siempre al entrar) ============ -->
+    <!-- nota del dev (se abre al entrar) -->
     <div
       x-show="aviso"
       x-transition.opacity
@@ -71,7 +71,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </div>
 
-    <!-- ============ HERO ============ -->
+    <!-- hero -->
     <section x-show="!yaBusque" class="max-w-5xl mx-auto px-4 pt-12 md:pt-20 pb-10">
       <div class="max-w-3xl">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium mb-6" style="background: var(--accent-tint); color: var(--accent)">
@@ -159,7 +159,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </section>
 
-    <!-- ============ RESULTADOS ============ -->
+    <!-- resultados -->
     <section x-show="yaBusque || loading" class="max-w-5xl mx-auto px-4 py-8">
       <!-- aviso coldstart -->
       <template x-if="loading && lentoOnDemand">
@@ -222,11 +222,11 @@ import Base from "../layouts/Base.astro";
             <span class="font-semibold" style="color: var(--fg)" x-text="gruposOrdenados().length"></span> grupos para “<span class="font-semibold" style="color: var(--fg)" x-text="ultimaQuery"></span>”
           </div>
 
-          <!-- tarjetas (price-ladder) -->
+          <!-- tarjetas -->
           <div class="space-y-5">
             <template x-for="(g, gi) in gruposOrdenados()" :key="g.principio_activo + (g.dosis || '')">
               <div class="surface rounded-2xl overflow-hidden rise" :style="`animation-delay:${Math.min(gi*60,300)}ms`">
-                <!-- cabecera con AHORRO destacado -->
+                <!-- cabecera con el ahorro -->
                 <div class="px-5 py-4 flex items-start justify-between gap-3 flex-wrap" style="border-bottom:1px solid var(--hairline)">
                   <div>
                     <h2 class="font-display text-xl font-extrabold capitalize" x-text="g.principio_activo"></h2>
@@ -289,7 +289,7 @@ import Base from "../layouts/Base.astro";
       </template>
     </section>
 
-    <!-- ============ CATEGORÍAS ============ -->
+    <!-- categorías -->
     <section x-show="!yaBusque" class="max-w-5xl mx-auto px-4 py-12">
       <h2 class="font-display text-2xl md:text-3xl font-extrabold mb-1">Busca por condición</h2>
       <p class="mb-8" style="color: var(--fg-soft)">Las más consultadas en farmacias chilenas</p>
@@ -304,7 +304,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </section>
 
-    <!-- ============ TOP ============ -->
+    <!-- top -->
     <section x-show="!yaBusque && top.length > 0" class="max-w-5xl mx-auto px-4 py-12">
       <h2 class="font-display text-2xl md:text-3xl font-extrabold mb-1">Mejores precios ahora</h2>
       <p class="mb-8" style="color: var(--fg-soft)">Lo más barato disponible por principio activo</p>
@@ -331,7 +331,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </section>
 
-    <!-- ============ CÓMO FUNCIONA (secuencia real → numeración justificada) ============ -->
+    <!-- cómo funciona -->
     <section x-show="!yaBusque" class="py-16" style="border-top:1px solid var(--hairline); background: var(--bg-surface)">
       <div class="max-w-5xl mx-auto px-4">
         <h2 class="font-display text-2xl md:text-3xl font-extrabold mb-10 text-center">Tres pasos. Sin registro, sin ads.</h2>
@@ -355,7 +355,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </section>
 
-    <!-- ============ MODAL HISTÓRICO ============ -->
+    <!-- modal histórico -->
     <div x-show="historico.abierto" x-transition.opacity @keydown.escape.window="cerrarHistorico()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,.5); backdrop-filter: blur(4px); display:none" role="dialog" aria-modal="true" aria-label="Histórico de precios">
       <div @click.outside="cerrarHistorico()" class="surface rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div class="px-6 py-4 flex items-center justify-between" style="border-bottom:1px solid var(--hairline)">
@@ -386,7 +386,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </div>
 
-    <!-- ============ MODAL ALERTA ============ -->
+    <!-- modal alerta -->
     <div x-show="alerta.abierto" x-transition.opacity @keydown.escape.window="cerrarAlerta()" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,.5); backdrop-filter: blur(4px); display:none" role="dialog" aria-modal="true" aria-label="Crear alerta de precio">
       <div @click.outside="cerrarAlerta()" class="surface rounded-2xl shadow-2xl max-w-md w-full p-6">
         <h3 class="font-display text-lg font-bold mb-1">Avísame si baja</h3>
@@ -418,7 +418,7 @@ import Base from "../layouts/Base.astro";
       </div>
     </div>
 
-    <!-- ============ FOOTER ============ -->
+    <!-- footer -->
     <footer class="py-10" style="border-top:1px solid var(--hairline)">
       <div class="max-w-5xl mx-auto px-4 text-sm" style="color: var(--fg-faint)">
         <div class="flex flex-wrap items-center justify-between gap-4">

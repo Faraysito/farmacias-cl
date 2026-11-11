@@ -16,7 +16,7 @@ from app.database import Base
 
 
 def utcnow() -> datetime:
-    """Timestamp timezone-aware (reemplaza datetime.utcnow, deprecado en 3.12)."""
+    """Fecha y hora actual en UTC (con zona horaria)."""
     return datetime.now(timezone.utc)
 
 

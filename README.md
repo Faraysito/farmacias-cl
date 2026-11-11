@@ -2,30 +2,14 @@
 
 > Plataforma para comparar precios de medicamentos entre las principales cadenas farmacéuticas de Chile (Cruz Verde, Salcobrand y Ahumada), agrupados por principio activo y dosis.
 
-**🌐 Demo:** https://farmacias-cl.vercel.app
-**⚙️ API:** https://farmacias-cl-api.onrender.com
-
-> 📋 Para el detalle de mejoras recientes, ver **[CAMBIOS.md](CAMBIOS.md)**.
-
----
+- Demo: https://farmacias-cl.vercel.app
+- API: https://farmacias-cl-api.onrender.com
 
 ## El problema
 
 En Chile, el mismo medicamento puede costar **20 veces más** dependiendo de la cadena y la marca. Un Losartán 50mg puede ir desde $1.495 hasta $32.207 por el mismo principio activo. La gente no compara porque no hay una forma fácil de hacerlo: cada cadena tiene su propio sitio, sus propios nombres comerciales y sus propios laboratorios.
 
 Este proyecto resuelve eso: una sola búsqueda, las tres cadenas comparadas lado a lado, agrupadas por principio activo para que veas todas las alternativas (incluyendo bioequivalentes más baratos) y el **ahorro exacto**.
-
----
-
-## Capturas
-
-> _(Añade aquí 2–3 capturas o un GIF del producto funcionando — es lo primero que mira un reclutador.)_
->
-> ```
-> docs/home.png   ·   docs/resultados.png   ·   docs/historico.png
-> ```
-
----
 
 ## Cómo funciona
 
@@ -37,8 +21,6 @@ Este proyecto resuelve eso: una sola búsqueda, las tres cadenas comparadas lado
 6. Se agrupan productos con el mismo principio activo + dosis y se calcula el ahorro
 7. El frontend muestra cada grupo como una tarjeta "escalera de precios", de menor a mayor
 8. El usuario puede filtrar, ordenar por ahorro, ver el histórico, crear una **alerta de precio** y comprar directo en la cadena
-
----
 
 ## Stack
 
@@ -62,8 +44,6 @@ Este proyecto resuelve eso: una sola búsqueda, las tres cadenas comparadas lado
 - **Render** (backend, free tier) · **Vercel** (frontend) · **Neon** (Postgres serverless)
 - **UptimeRobot** (ping cada 5 min anti cold-start)
 - **GitHub Actions** (cron nocturno de scrape + CI de lint/tests/build)
-
----
 
 ## Decisiones técnicas clave
 
@@ -93,13 +73,10 @@ Cada scrape guarda una fila por (medicamento, farmacia) **solo una vez al día**
 ### Búsqueda con índices trigram
 `LIKE '%q%'` se apoya en índices GIN `pg_trgm` (migración `a1f2c3d4e5f6`) en vez de escanear toda la tabla.
 
----
-
 ## Estructura del proyecto
 ~~~
 farmacias-cl/
 ├── README.md
-├── CAMBIOS.md
 ├── docker-compose.yml          # Postgres + PostGIS para dev local
 ├── .github/workflows/
 │   ├── scrape-cron.yml         # Cron nocturno
@@ -148,8 +125,6 @@ farmacias-cl/
         │   └── acerca.astro    # Contexto + aviso legal
         └── styles/global.css   # Tokens, dark mode, animaciones
 ~~~
-
----
 
 ## Setup local
 
@@ -207,8 +182,6 @@ pytest -q
 ruff check app tests
 ```
 
----
-
 ## Endpoints
 
 | Método | Ruta | Descripción |
@@ -221,8 +194,6 @@ ruff check app tests
 | DELETE | `/api/alertas/{id}` | Cancela alerta |
 | POST | `/api/admin/scrape-top` | Scrape del top (header `X-Admin-Token`) |
 | GET | `/api/health` | Health check |
-
----
 
 ## Deploy
 
@@ -242,8 +213,6 @@ ruff check app tests
 ### Cron e infra
 - `.github/workflows/scrape-cron.yml` (04:00 UTC) con secret `ADMIN_TOKEN`
 - UptimeRobot pinga la API cada 5 min anti cold-start
-
----
 
 ## Roadmap
 
